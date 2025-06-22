@@ -35,7 +35,7 @@ export async function extractQuestions(input: ExtractQuestionsInput): Promise<Ex
 
 const prompt = ai.definePrompt({
   name: 'extractQuestionsPrompt',
-  model: 'googleai/gemini-1.5-pro-latest',
+  model: 'googleai/gemini-1.5-flash-latest',
   input: {schema: ExtractQuestionsInputSchema},
   output: {schema: ExtractQuestionsOutputSchema},
   prompt: `You are an expert in creating quizzes from text or documents. Your goal is to generate high-quality educational material.
