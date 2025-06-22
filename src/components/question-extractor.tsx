@@ -13,16 +13,10 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Download, Info, FileQuestion } from 'lucide-react';
+import { Loader2, Download, FileQuestion } from 'lucide-react';
 import { extractQuestionsAction } from '@/app/actions';
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 type Question = {
   question: string;
@@ -188,86 +182,75 @@ export default function QuestionExtractor() {
           </CardHeader>
           <CardContent>
             {questions.length > 0 ? (
-              <TooltipProvider>
-                <div className="overflow-x-auto">
-                    <Table className="min-w-full">
-                    <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[30%]">{t.tableHeaderQuestion}</TableHead>
-                          <TableHead>A</TableHead>
-                          <TableHead>B</TableHead>
-                          <TableHead>C</TableHead>
-                          <TableHead>D</TableHead>
-                          <TableHead>E</TableHead>
-                          <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
-                          <TableHead className="text-center">{t.tableHeaderExplanation}</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {questions.map((q, qIndex) => (
-                        <TableRow key={qIndex}>
-                            <TableCell className="font-medium">{q.question}</TableCell>
-                            {Array.from({ length: 5 }).map((_, oIndex) => {
-                                const optionText = q.options[oIndex] || '';
-                                const isCorrect = q.correctAnswer === optionText;
-                                
-                                return (
-                                    <TableCell key={oIndex} className="p-1">
-                                    {optionText && (
-                                        <Label
-                                          htmlFor={`q${qIndex}-o${oIndex}`}
-                                          className={cn(
-                                            "flex items-center w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors",
-                                            isCorrect ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
-                                          )}
-                                        >
-                                          <input
-                                            type="radio"
-                                            id={`q${qIndex}-o${oIndex}`}
-                                            name={`question-${qIndex}`}
-                                            value={optionText}
-                                            checked={isCorrect}
-                                            onChange={() => handleCorrectAnswerChange(qIndex, optionText)}
-                                            className="sr-only"
-                                          />
-                                          <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all", isCorrect ? "border-primary bg-primary" : "border-muted-foreground")}>
-                                            {isCorrect && <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>}
-                                          </div>
-                                          <span>{optionText}</span>
-                                        </Label>
-                                    )}
-                                    </TableCell>
-                                );
-                            })}
-                            <TableCell className="font-semibold text-primary">{q.correctAnswer}</TableCell>
-                            <TableCell className="text-center">
-                              {q.explanation && (
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Info className="h-5 w-5 text-muted-foreground mx-auto" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="max-w-xs">{q.explanation}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
+              <div className="overflow-x-auto">
+                  <Table className="min-w-full">
+                  <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[30%]">{t.tableHeaderQuestion}</TableHead>
+                        <TableHead className="text-center">A</TableHead>
+                        <TableHead className="text-center">B</TableHead>
+                        <TableHead className="text-center">C</TableHead>
+                        <TableHead className="text-center">D</TableHead>
+                        <TableHead className="text-center">E</TableHead>
+                        <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
+                        <TableHead className="w-[30%]">{t.tableHeaderExplanation}</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {questions.map((q, qIndex) => (
+                      <TableRow key={qIndex}>
+                          <TableCell className="font-medium align-top">{q.question}</TableCell>
+                          {Array.from({ length: 5 }).map((_, oIndex) => {
+                              const optionText = q.options[oIndex] || '';
+                              const isCorrect = q.correctAnswer === optionText;
+                              
+                              return (
+                                  <TableCell key={oIndex} className="p-1 align-top">
+                                  {optionText && (
+                                      <Label
+                                        htmlFor={`q${qIndex}-o${oIndex}`}
+                                        className={cn(
+                                          "flex items-center w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                                          isCorrect ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
+                                        )}
+                                      >
+                                        <input
+                                          type="radio"
+                                          id={`q${qIndex}-o${oIndex}`}
+                                          name={`question-${qIndex}`}
+                                          value={optionText}
+                                          checked={isCorrect}
+                                          onChange={() => handleCorrectAnswerChange(qIndex, optionText)}
+                                          className="sr-only"
+                                        />
+                                        <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all", isCorrect ? "border-primary bg-primary" : "border-muted-foreground")}>
+                                          {isCorrect && <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>}
+                                        </div>
+                                        <span>{optionText}</span>
+                                      </Label>
+                                  )}
+                                  </TableCell>
+                              );
+                          })}
+                          <TableCell className="font-semibold text-primary align-top">{q.correctAnswer}</TableCell>
+                          <TableCell className="align-top">
+                            <p className="text-sm text-muted-foreground">{q.explanation}</p>
+                          </TableCell>
+                      </TableRow>
+                      ))}
+                      {isPending && (
+                         <TableRow>
+                            <TableCell colSpan={8} className="p-8 text-center">
+                              <div className="flex justify-center items-center gap-3">
+                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                <span className="text-muted-foreground">{t.analyzingButton}</span>
+                              </div>
                             </TableCell>
-                        </TableRow>
-                        ))}
-                        {isPending && (
-                           <TableRow>
-                              <TableCell colSpan={8} className="p-8 text-center">
-                                <div className="flex justify-center items-center gap-3">
-                                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                  <span className="text-muted-foreground">{t.analyzingButton}</span>
-                                </div>
-                              </TableCell>
-                           </TableRow>
-                        )}
-                    </TableBody>
-                    </Table>
-                </div>
-              </TooltipProvider>
+                         </TableRow>
+                      )}
+                  </TableBody>
+                  </Table>
+              </div>
             ) : (
               <div className="text-center text-muted-foreground p-12 space-y-3">
                 <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50"/>
