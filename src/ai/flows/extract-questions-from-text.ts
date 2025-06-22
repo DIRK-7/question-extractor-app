@@ -1,0 +1,75 @@
+'use server';
+/**
+ * @fileOverview An AI agent that extracts questions and answers from a block of text.
+ *
+ * - extractQuestions - A function that handles the question extraction process.
+ * - ExtractQuestionsInput - The input type for the extractQuestions function.
+ * - ExtractQuestionsOutput - The return type for the extractQuestions function.
+ */
+
+import {ai} from '@/ai/genkit';
+import {z} from 'genkit';
+
+const ExtractQuestionsInputSchema = z.object({
+  text: z.string().describe('The block of text to extract questions from.'),
+  language: z.enum(['ar', 'en']).describe('The language of the text (ar for Arabic, en for English).'),
+});
+export type ExtractQuestionsInput = z.infer<typeof ExtractQuestionsInputSchema>;
+
+const ExtractQuestionsOutputSchema = z.object({
+  questions: z.array(
+    z.object({
+      question: z.string().describe('The extracted question.'),
+      options: z.array(z.string()).describe('The possible answers to the question.'),
+      correctAnswer: z.string().describe('The correct answer to the question.'),
+    })
+  ).describe('The extracted questions and answers.'),
+});
+export type ExtractQuestionsOutput = z.infer<typeof ExtractQuestionsOutputSchema>;
+
+export async function extractQuestions(input: ExtractQuestionsInput): Promise<ExtractQuestionsOutput> {
+  return extractQuestionsFlow(input);
+}
+
+const prompt = ai.definePrompt({
+  name: 'extractQuestionsPrompt',
+  input: {schema: ExtractQuestionsInputSchema},
+  output: {schema: ExtractQuestionsOutputSchema},
+  prompt: `You are an expert in creating quizzes from text.
+
+  Given the following text, extract potential questions and answers, along with the correct answer for each question. The questions should be relevant to the content of the text, and the answers should be accurate and clear.
+
+  Language: {{language}}
+  Text: {{{text}}}
+
+  Format the output as a JSON object with a "questions" array. Each object in the array should have the keys "question", "options" and "correctAnswer". The options array should contain strings.
+  The value for the correctAnswer key should be one of the strings in the options array.
+  Example:
+  {
+    "questions": [
+      {
+        "question": "What is the capital of France?",
+        "options": ["Berlin", "Paris", "Rome", "Madrid"],
+        "correctAnswer": "Paris"
+      },
+      {
+        "question": "What is the highest mountain in the world?",
+        "options": ["Mount Everest", "K2", "Kangchenjunga", "Lhotse"],
+        "correctAnswer": "Mount Everest"
+      }
+    ]
+  }
+  `,
+});
+
+const extractQuestionsFlow = ai.defineFlow(
+  {
+    name: 'extractQuestionsFlow',
+    inputSchema: ExtractQuestionsInputSchema,
+    outputSchema: ExtractQuestionsOutputSchema,
+  },
+  async input => {
+    const {output} = await prompt(input);
+    return output!;
+  }
+);
