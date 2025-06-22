@@ -328,8 +328,8 @@ function QuestionExtractorComponent() {
   } | null>(null);
 
   const t = translations[language];
-  const activeFile = findNode(fileTree, activeFileId) as FileNode | null;
   const { isMobile, setOpenMobile } = useSidebar();
+  const activeFile = findNode(fileTree, activeFileId) as FileNode | null;
 
 
   // Load tree from localStorage on mount
@@ -438,17 +438,23 @@ function QuestionExtractorComponent() {
 
   // Check for unsaved changes
   useEffect(() => {
-    if (!activeFile) {
-      setIsDirty(false);
+    if (!activeFileId) {
+      // If no file is active, any questions are "dirty" by default if they exist.
+      setIsDirty(questions.length > 0);
       return;
     }
-    const savedQuestions = activeFile.questions;
+    const savedFile = findNode(fileTree, activeFileId) as FileNode | null;
+    if (!savedFile) {
+      setIsDirty(questions.length > 0);
+      return;
+    }
+    const savedQuestions = savedFile.questions;
     if (JSON.stringify(savedQuestions) !== JSON.stringify(questions)) {
       setIsDirty(true);
     } else {
       setIsDirty(false);
     }
-  }, [questions, activeFile]);
+  }, [questions, activeFileId, fileTree]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -501,15 +507,6 @@ function QuestionExtractorComponent() {
       });
       return;
     }
-    
-    if (!activeFileId) {
-      toast({
-        title: t.errorToastTitle,
-        description: t.noActiveFile,
-        variant: 'destructive',
-      });
-      return;
-    }
 
     const detectedLang = text ? detectLanguage(text) : language;
     setLanguage(detectedLang);
@@ -526,7 +523,11 @@ function QuestionExtractorComponent() {
 
         const result = await extractQuestionsAction(inputPayload);
 
-        setQuestions((prevQuestions) => [...prevQuestions, ...result.questions]);
+        // If a file is active, add to it. Otherwise, treat as new set of questions.
+        setQuestions((prevQuestions) => 
+            activeFileId ? [...prevQuestions, ...result.questions] : result.questions
+        );
+
         setText('');
         setFileDataUri(null);
         setFileName(null);
@@ -550,7 +551,7 @@ function QuestionExtractorComponent() {
   };
 
   const executeWithUnsavedChangesCheck = (action: () => void) => {
-    if (isDirty) {
+    if (isDirty && activeFileId) {
       setNextAction(() => action);
       setIsUnsavedChangesDialogOpen(true);
     } else {
@@ -1022,36 +1023,32 @@ function QuestionExtractorComponent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <header className="flex justify-between items-center mb-10">
-        <div className="text-right">
-             <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">
-                {t.title}
-            </h1>
-            <p className="text-muted-foreground mt-3 text-lg md:text-xl">
-                {t.description}
-            </p>
-        </div>
-        <div className="md:hidden">
-           <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">{t.menu}</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="p-0">
-               {SidebarComponent}
-            </SheetContent>
-          </Sheet>
-        </div>
-      </header>
-
       <div className="flex flex-row-reverse gap-8">
-        <div className="hidden md:block">
-            {SidebarComponent}
-        </div>
+        {SidebarComponent}
         
         <SidebarInset className="flex-1 min-w-0">
+         <header className="flex justify-between items-center mb-10">
+            <div className="text-right">
+                <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">
+                    {t.title}
+                </h1>
+                <p className="text-muted-foreground mt-3 text-lg md:text-xl">
+                    {t.description}
+                </p>
+            </div>
+            <div className="flex items-center gap-2">
+                <ThemeToggle />
+                 <div className="md:hidden">
+                    <SidebarTrigger asChild>
+                    <Button variant="outline" size="icon">
+                        <Menu className="h-6 w-6" />
+                        <span className="sr-only">{t.menu}</span>
+                    </Button>
+                    </SidebarTrigger>
+                </div>
+            </div>
+        </header>
+
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             <div className="xl:col-span-2">
               <Card className="shadow-sm border h-full">
@@ -1075,7 +1072,7 @@ function QuestionExtractorComponent() {
                       >
                         <Save className="mr-2 h-4 w-4" />
                         {t.saveFile}
-                        {isDirty && (
+                        {isDirty && activeFileId && (
                           <span
                             className="ml-2 h-2 w-2 rounded-full bg-destructive animate-pulse"
                             title={t.unsavedChangesTooltip}
@@ -1085,7 +1082,7 @@ function QuestionExtractorComponent() {
                       <Button
                         variant="outline"
                         onClick={handleAddQuestion}
-                        disabled={isPending || !activeFileId}
+                        disabled={isPending}
                       >
                         <PlusCircle className="mr-2 h-4 w-4" />
                         {t.addNewQuestionButton}
@@ -1175,12 +1172,11 @@ function QuestionExtractorComponent() {
                           </AlertDialog>
                         </>
                       )}
-                      <ThemeToggle />
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {activeFileId && (questions.length > 0 || isPending) ? (
+                  {(questions.length > 0 || isPending) ? (
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -1327,9 +1323,9 @@ function QuestionExtractorComponent() {
                     <div className="text-center text-muted-foreground p-12 space-y-3 h-full flex flex-col justify-center items-center">
                         <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
                         <h3 className="text-xl font-semibold text-foreground">
-                            {activeFileId ? t.noQuestionsYet : t.noFileSelected}
+                            {t.noFileSelected}
                         </h3>
-                        <p>{activeFileId ? t.noQuestionsDescription : t.noFileSelected}</p>
+                        <p>{t.noQuestionsDescription}</p>
                     </div>
                 )}
                 </CardContent>
@@ -1350,7 +1346,6 @@ function QuestionExtractorComponent() {
                     onChange={handleTextChange}
                     className="min-h-[150px] text-base focus-visible:ring-primary"
                     dir={detectLanguage(text) === 'ar' ? 'rtl' : 'ltr'}
-                    disabled={!activeFileId}
                   />
 
                   <div className="relative my-4 flex items-center justify-center">
@@ -1368,13 +1363,12 @@ function QuestionExtractorComponent() {
                     onChange={handleFileChange}
                     className="hidden"
                     accept="application/pdf,image/png,image/jpeg"
-                    disabled={!activeFileId}
                   />
                   <Button
                     onClick={() => fileInputRef.current?.click()}
                     variant="outline"
                     className="w-full"
-                    disabled={isPending || !activeFileId}
+                    disabled={isPending}
                   >
                     <Upload className="mr-2 h-4 w-4" />
                     {fileName || t.uploadFileButton}
@@ -1382,7 +1376,7 @@ function QuestionExtractorComponent() {
 
                   <Button
                     onClick={handleAnalyze}
-                    disabled={isPending || (!text.trim() && !fileDataUri) || !activeFileId}
+                    disabled={isPending || (!text.trim() && !fileDataUri)}
                     className="mt-6 w-full"
                     size="lg"
                   >
