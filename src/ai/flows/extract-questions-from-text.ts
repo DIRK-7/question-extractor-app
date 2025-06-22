@@ -35,6 +35,7 @@ export async function extractQuestions(input: ExtractQuestionsInput): Promise<Ex
 
 const prompt = ai.definePrompt({
   name: 'extractQuestionsPrompt',
+  model: 'googleai/gemini-1.5-pro-latest',
   input: {schema: ExtractQuestionsInputSchema},
   output: {schema: ExtractQuestionsOutputSchema},
   prompt: `You are an expert in creating quizzes from text or documents. Your goal is to generate high-quality educational material.
@@ -46,8 +47,6 @@ const prompt = ai.definePrompt({
   2.  A list of multiple-choice options.
   3.  The single correct answer from the options.
   4.  A detailed, academic, and accurate explanation for why the answer is correct. This explanation should be comprehensive, reference the source material where applicable, and clarify any underlying concepts to enhance learning. Avoid brief or superficial explanations.
-
-  The questions should be relevant to the content of the document, and the answers should be accurate and clear.
 
   Language: {{language}}
   
