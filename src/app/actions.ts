@@ -1,37 +1,75 @@
 'use server';
 
-import { extractQuestions as extractQuestionsFlow, ExtractQuestionsInput, ExtractQuestionsOutput } from '@/ai/flows/extract-questions-from-text';
+import {
+  extractQuestions as extractQuestionsFlow,
+  ExtractQuestionsInput,
+  ExtractQuestionsOutput,
+} from '@/ai/flows/extract-questions-from-text';
+import { correctMergedOptions } from '@/ai/flows/correct-merged-options';
 
-export async function extractQuestionsAction(input: ExtractQuestionsInput): Promise<ExtractQuestionsOutput> {
+export async function extractQuestionsAction(
+  input: ExtractQuestionsInput
+): Promise<ExtractQuestionsOutput> {
   try {
     const result = await extractQuestionsFlow(input);
     if (!result || !result.questions) {
       throw new Error('Invalid response from AI');
     }
-    // Post-processing to ensure options are clean and split correctly
-    result.questions = result.questions.map(q => {
-      const cleanedOptions = q.options
-        .flatMap(opt => opt.split(/[\n;]|\s*\d+\.\s*/)) // Split merged options
-        .map(opt => opt.trim()) // Trim whitespace
-        .filter(opt => opt.length > 0); // Remove empty options
 
-      // Ensure the correct answer is still valid after cleaning
-      const newCorrectAnswer = cleanedOptions.find(opt => q.correctAnswer.includes(opt)) || cleanedOptions[0] || '';
+    // Post-processing to fix potentially merged options and clean up data.
+    const processedQuestions = await Promise.all(
+      result.questions.map(async (q) => {
+        // Heuristic to detect if options might be merged.
+        // A simple check for newlines is a strong indicator.
+        const needsCorrection = q.options.some((opt) => opt.includes('\n'));
+        
+        let currentQuestion = { ...q };
 
-      return {
-        ...q,
-        options: cleanedOptions,
-        correctAnswer: newCorrectAnswer,
-        explanation: q.explanation || '',
-      };
-    });
+        if (needsCorrection) {
+          try {
+            // If options seem merged, ask the AI to correct them.
+            const corrected = await correctMergedOptions({
+              question: q.question,
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+            });
+            currentQuestion = {
+              ...q,
+              question: corrected.correctedQuestion,
+              options: corrected.correctedOptions,
+              correctAnswer: corrected.correctedAnswer,
+            };
+          } catch (e) {
+            console.error('AI correction failed, falling back to basic cleaning', e);
+            // Fallback to the original logic if correction flow fails.
+            const cleanedOptions = q.options
+              .flatMap((opt) => opt.split(/[\n;]|\s*\d+\.\s*/))
+              .map((opt) => opt.trim())
+              .filter((opt) => opt.length > 0);
+            
+            const newCorrectAnswer = cleanedOptions.find((opt) => q.correctAnswer.includes(opt)) || cleanedOptions[0] || '';
+            
+            currentQuestion = { ...q, options: cleanedOptions, correctAnswer: newCorrectAnswer };
+          }
+        }
+        
+        // Ensure explanation is not null/undefined
+        return {
+          ...currentQuestion,
+          options: currentQuestion.options.map(opt => opt.trim()).filter(opt => opt),
+          explanation: currentQuestion.explanation || '',
+        };
+      })
+    );
 
-    return result;
+    return { questions: processedQuestions };
+
   } catch (error) {
-    console.error("Error in extractQuestionsAction:", error);
-    // Re-throwing the error to be handled by the client
+    console.error('Error in extractQuestionsAction:', error);
     if (error instanceof Error) {
-        throw new Error(`An error occurred during question extraction: ${error.message}`);
+      throw new Error(
+        `An error occurred during question extraction: ${error.message}`
+      );
     }
     throw new Error('An unknown error occurred during question extraction.');
   }

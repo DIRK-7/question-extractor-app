@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Download, Info } from 'lucide-react';
+import { Loader2, Download, Info, FileQuestion } from 'lucide-react';
 import { extractQuestionsAction } from '@/app/actions';
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
@@ -34,40 +34,42 @@ type Question = {
 const translations = {
   ar: {
     title: 'مُستخرِج الأسئلة',
-    description: 'أتمتة عملية إنشاء بنوك الأسئلة متعددة الخيارات من النصوص.',
-    textAreaPlaceholder: 'الصق النص هنا لإضافة أسئلة جديدة...',
-    analyzeButton: 'إضافة أسئلة من النص',
-    analyzingButton: 'جاري الإضافة...',
-    downloadButton: 'تنزيل كملف Excel',
+    description: 'حوّل نصوصك إلى اختبارات تفاعلية ببضع نقرات.',
+    textAreaPlaceholder: 'الصق النص هنا لاستخراج الأسئلة...',
+    analyzeButton: 'استخراج الأسئلة',
+    analyzingButton: 'جاري الاستخراج...',
+    downloadButton: 'تنزيل كملف CSV',
     tableHeaderQuestion: 'السؤال',
     tableHeaderCorrectAnswer: 'الإجابة الصحيحة',
-    tableHeaderExplanation: 'تفسير الإجابة',
-    errorToastTitle: 'خطأ',
-    errorToastDescription: 'حدث خطأ أثناء استخراج الأسئلة.',
+    tableHeaderExplanation: 'التفسير',
+    errorToastTitle: 'حدث خطأ',
+    errorToastDescription: 'فشل استخراج الأسئلة. الرجاء المحاولة مرة أخرى.',
     errorEmptyText: 'الرجاء إدخال نص للتحليل.',
     successToastTitle: 'نجاح',
-    successToastDescription: 'تمت إضافة الأسئلة بنجاح إلى الجدول.',
-    extractedQuestionsTitle: 'الأسئلة المستخرجة',
-    noQuestionsYet: 'لا توجد أسئلة حتى الآن. الصق نصًا في الأسفل وأضف أسئلة جديدة.',
+    successToastDescription: 'تمت إضافة الأسئلة الجديدة بنجاح.',
+    extractedQuestionsTitle: 'بنك الأسئلة',
+    noQuestionsYet: 'لم يتم استخراج أي أسئلة بعد.',
+    noQuestionsDescription: 'الصق نصاً في المربع أدناه للبدء.',
     addNewTextCardTitle: 'إضافة أسئلة جديدة من نص',
   },
   en: {
     title: 'Question Extractor',
-    description: 'Automate creating multiple-choice question banks from text.',
-    textAreaPlaceholder: 'Paste your text here to add new questions...',
-    analyzeButton: 'Add Questions from Text',
-    analyzingButton: 'Adding...',
-    downloadButton: 'Download as Excel File',
+    description: 'Turn your texts into interactive quizzes with a few clicks.',
+    textAreaPlaceholder: 'Paste your text here to extract questions...',
+    analyzeButton: 'Extract Questions',
+    analyzingButton: 'Extracting...',
+    downloadButton: 'Download as CSV',
     tableHeaderQuestion: 'Question',
     tableHeaderCorrectAnswer: 'Correct Answer',
-    tableHeaderExplanation: 'Answer Explanation',
+    tableHeaderExplanation: 'Explanation',
     errorToastTitle: 'Error',
-    errorToastDescription: 'An error occurred while extracting questions.',
+    errorToastDescription: 'Failed to extract questions. Please try again.',
     errorEmptyText: 'Please enter text to analyze.',
     successToastTitle: 'Success',
-    successToastDescription: 'New questions added to the table successfully.',
-    extractedQuestionsTitle: 'Extracted Questions',
-    noQuestionsYet: 'No questions yet. Paste text below to add new questions.',
+    successToastDescription: 'New questions added successfully.',
+    extractedQuestionsTitle: 'Question Bank',
+    noQuestionsYet: 'No questions extracted yet.',
+    noQuestionsDescription: 'Paste text in the box below to get started.',
     addNewTextCardTitle: 'Add New Questions from Text',
   },
 };
@@ -133,10 +135,10 @@ export default function QuestionExtractor() {
   
   const handleDownload = () => {
     const headers = [
-      t.tableHeaderQuestion,
-      'A', 'B', 'C', 'D', 'E',
-      t.tableHeaderCorrectAnswer,
-      t.tableHeaderExplanation
+      `"${t.tableHeaderQuestion}"`,
+      '"Option A"', '"Option B"', '"Option C"', '"Option D"', '"Option E"',
+      `"${t.tableHeaderCorrectAnswer}"`,
+      `"${t.tableHeaderExplanation}"`
     ].join(';');
 
     const rows = questions.map(q => {
@@ -165,131 +167,143 @@ export default function QuestionExtractor() {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      <header className="text-center mb-8">
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+      <header className="text-center mb-10">
         <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">{t.title}</h1>
-        <p className="text-muted-foreground mt-2 text-lg">{t.description}</p>
+        <p className="text-muted-foreground mt-3 text-lg md:text-xl">{t.description}</p>
       </header>
 
-      <Card className="mb-8 shadow-lg">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <CardTitle className="font-headline">{t.extractedQuestionsTitle}</CardTitle>
-            {questions.length > 0 && (
-              <Button onClick={handleDownload} variant="outline" disabled={isPending}>
-                <Download className="mr-2 h-4 w-4" />
-                {t.downloadButton}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isPending && questions.length === 0 ? (
-             <div className="flex justify-center items-center p-8">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-             </div>
-          ) : questions.length > 0 ? (
-            <TooltipProvider>
-              <div className="overflow-x-auto">
-                  <Table>
-                  <TableHeader>
-                      <TableRow>
-                      <TableHead className="min-w-[250px]">{t.tableHeaderQuestion}</TableHead>
-                      <TableHead>A</TableHead>
-                      <TableHead>B</TableHead>
-                      <TableHead>C</TableHead>
-                      <TableHead>D</TableHead>
-                      <TableHead>E</TableHead>
-                      <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
-                      <TableHead>{t.tableHeaderExplanation}</TableHead>
-                      </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                      {questions.map((q, qIndex) => (
-                      <TableRow key={qIndex}>
-                          <TableCell className="font-medium">{q.question}</TableCell>
-                          {Array.from({ length: 5 }).map((_, oIndex) => {
-                              const optionText = q.options[oIndex] || '';
-                              const isCorrect = q.correctAnswer === optionText;
-                              
-                              return (
-                                  <TableCell key={oIndex}>
-                                  {optionText && (
-                                      <div
-                                          onClick={() => handleCorrectAnswerChange(qIndex, optionText)}
-                                          className={cn(
-                                              "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
-                                              isCorrect ? 'bg-accent' : 'hover:bg-muted'
-                                          )}
-                                      >
-                                          <input
-                                              type="radio"
-                                              id={`q${qIndex}-o${oIndex}`}
-                                              name={`question-${qIndex}`}
-                                              value={optionText}
-                                              checked={isCorrect}
-                                              onChange={() => {}}
-                                              className="form-radio h-4 w-4 accent-primary"
-                                          />
-                                          <Label htmlFor={`q${qIndex}-o${oIndex}`} className="cursor-pointer">
-                                              {optionText}
-                                          </Label>
-                                      </div>
-                                  )}
-                                  </TableCell>
-                              );
-                          })}
-                          <TableCell className="font-semibold text-primary">{q.correctAnswer}</TableCell>
-                          <TableCell>
-                            {q.explanation && (
-                              <Tooltip>
-                                <TooltipTrigger>
-                                  <Info className="h-5 w-5 text-muted-foreground" />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-sm">{q.explanation}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </TableCell>
-                      </TableRow>
-                      ))}
-                  </TableBody>
-                  </Table>
-              </div>
-            </TooltipProvider>
-          ) : (
-            <div className="text-center text-muted-foreground p-8">
-              <p>{t.noQuestionsYet}</p>
+      <div className="space-y-8">
+        <Card className="shadow-sm border">
+          <CardHeader>
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+              <CardTitle className="font-headline text-2xl">{t.extractedQuestionsTitle}</CardTitle>
+              {questions.length > 0 && (
+                <Button onClick={handleDownload} variant="outline" disabled={isPending}>
+                  <Download className="mr-2 h-4 w-4" />
+                  {t.downloadButton}
+                </Button>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="font-headline">{t.addNewTextCardTitle}</CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <Textarea
-            placeholder={t.textAreaPlaceholder}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="min-h-[150px] text-base"
-            dir={detectLanguage(text) === 'ar' ? 'rtl' : 'ltr'}
-          />
-          <Button onClick={handleAnalyze} disabled={isPending || !text.trim()} className="mt-4 w-full md:w-auto">
-            {isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {t.analyzingButton}
-              </>
+          </CardHeader>
+          <CardContent>
+            {questions.length > 0 ? (
+              <TooltipProvider>
+                <div className="overflow-x-auto">
+                    <Table className="min-w-full">
+                    <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[30%]">{t.tableHeaderQuestion}</TableHead>
+                          <TableHead>A</TableHead>
+                          <TableHead>B</TableHead>
+                          <TableHead>C</TableHead>
+                          <TableHead>D</TableHead>
+                          <TableHead>E</TableHead>
+                          <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
+                          <TableHead className="text-center">{t.tableHeaderExplanation}</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {questions.map((q, qIndex) => (
+                        <TableRow key={qIndex}>
+                            <TableCell className="font-medium">{q.question}</TableCell>
+                            {Array.from({ length: 5 }).map((_, oIndex) => {
+                                const optionText = q.options[oIndex] || '';
+                                const isCorrect = q.correctAnswer === optionText;
+                                
+                                return (
+                                    <TableCell key={oIndex} className="p-1">
+                                    {optionText && (
+                                        <Label
+                                          htmlFor={`q${qIndex}-o${oIndex}`}
+                                          className={cn(
+                                            "flex items-center w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                                            isCorrect ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
+                                          )}
+                                        >
+                                          <input
+                                            type="radio"
+                                            id={`q${qIndex}-o${oIndex}`}
+                                            name={`question-${qIndex}`}
+                                            value={optionText}
+                                            checked={isCorrect}
+                                            onChange={() => handleCorrectAnswerChange(qIndex, optionText)}
+                                            className="sr-only"
+                                          />
+                                          <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all", isCorrect ? "border-primary bg-primary" : "border-muted-foreground")}>
+                                            {isCorrect && <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>}
+                                          </div>
+                                          <span>{optionText}</span>
+                                        </Label>
+                                    )}
+                                    </TableCell>
+                                );
+                            })}
+                            <TableCell className="font-semibold text-primary">{q.correctAnswer}</TableCell>
+                            <TableCell className="text-center">
+                              {q.explanation && (
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Info className="h-5 w-5 text-muted-foreground mx-auto" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="max-w-xs">{q.explanation}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                        {isPending && (
+                           <TableRow>
+                              <TableCell colSpan={8} className="p-8 text-center">
+                                <div className="flex justify-center items-center gap-3">
+                                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                  <span className="text-muted-foreground">{t.analyzingButton}</span>
+                                </div>
+                              </TableCell>
+                           </TableRow>
+                        )}
+                    </TableBody>
+                    </Table>
+                </div>
+              </TooltipProvider>
             ) : (
-              t.analyzeButton
+              <div className="text-center text-muted-foreground p-12 space-y-3">
+                <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50"/>
+                <h3 className="text-xl font-semibold text-foreground">{t.noQuestionsYet}</h3>
+                <p>{isPending ? t.analyzingButton : t.noQuestionsDescription}</p>
+                 {isPending && <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mt-4" />}
+              </div>
             )}
-          </Button>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        
+        <Card className="shadow-sm border">
+          <CardHeader>
+            <CardTitle className="font-headline text-2xl">{t.addNewTextCardTitle}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              placeholder={t.textAreaPlaceholder}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              className="min-h-[180px] text-base focus-visible:ring-primary"
+              dir={detectLanguage(text) === 'ar' ? 'rtl' : 'ltr'}
+            />
+            <Button onClick={handleAnalyze} disabled={isPending || !text.trim()} className="mt-4 w-full md:w-auto" size="lg">
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t.analyzingButton}
+                </>
+              ) : (
+                t.analyzeButton
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
