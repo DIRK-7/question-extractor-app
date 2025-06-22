@@ -20,12 +20,12 @@ export async function extractQuestionsAction(
     const processedQuestions = await Promise.all(
       result.questions.map(async (q) => {
         // Heuristic to detect if options might be merged.
-        // A simple check for newlines is a strong indicator.
-        const needsCorrection = q.options.some((opt) => opt.includes('\n'));
+        // A simple check for newlines or multiple sentences is a strong indicator.
+        const needsCorrection = q.options.some((opt) => opt.includes('\n') || opt.split('. ').length > 2);
         
         let currentQuestion = { ...q };
 
-        if (needsCorrection) {
+        if (needsCorrection && q.options.length < 5) {
           try {
             // If options seem merged, ask the AI to correct them.
             const corrected = await correctMergedOptions({
@@ -53,7 +53,7 @@ export async function extractQuestionsAction(
           }
         }
         
-        // Ensure explanation is not null/undefined
+        // Ensure explanation is not null/undefined and options are clean
         return {
           ...currentQuestion,
           options: currentQuestion.options.map(opt => opt.trim()).filter(opt => opt),

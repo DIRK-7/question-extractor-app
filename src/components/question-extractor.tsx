@@ -57,6 +57,7 @@ import {
   FolderPlus,
   FilePlus,
   ChevronRight,
+  Menu,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -66,7 +67,9 @@ import {
   SidebarInset,
   SidebarTrigger,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 import { extractQuestionsAction } from '@/app/actions';
 import { cn } from '@/lib/utils';
@@ -84,7 +87,7 @@ type Question = {
 
 type FileNode = {
   id: string;
-  name: string;
+  name:string;
   type: 'file';
   questions: Question[];
 };
@@ -183,9 +186,8 @@ const translations = {
     successToastTitle: 'نجاح',
     successToastDescription: 'تمت إضافة الأسئلة الجديدة بنجاح.',
     extractedQuestionsTitle: 'بنك الأسئلة',
-    noQuestionsYet: 'لم يتم استخراج أي أسئلة بعد.',
-    noQuestionsDescription:
-      'ابدأ بلصق نص أو رفع مستند، ثم احفظهم في ملف جديد.',
+    noQuestionsYet: 'لا توجد أسئلة في هذا الملف بعد.',
+    noQuestionsDescription: 'استخدم اللوحة اليمنى لإضافة أسئلة جديدة.',
     addNewTextCardTitle: 'إضافة أسئلة جديدة',
     uploadFileButton: 'رفع ملف (صورة أو PDF)',
     orSeparator: 'أو',
@@ -209,8 +211,8 @@ const translations = {
     newFile: 'ملف جديد',
     rename: 'إعادة تسمية',
     delete: 'حذف',
-    enterFolderName: 'أدخل اسم المجلد',
-    enterFileName: 'أدخل اسم الملف',
+    enterFolderName: 'أدخل اسم المجلد (مثال: كلية الطب)',
+    enterFileName: 'أدخل اسم المادة (مثال: علم التشريح)',
     deleteItemConfirmTitle: 'هل أنت متأكد من الحذف؟',
     deleteItemConfirmDescription:
       'سيتم حذف هذا العنصر وجميع محتوياته بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
@@ -219,11 +221,12 @@ const translations = {
     unsavedChangesDescription: 'هل تريد المتابعة وتجاهل التغييرات؟',
     discardChanges: 'تجاهل',
     unsavedChangesTooltip: 'توجد تغييرات غير محفوظة',
-    noFileSelected: 'ابدأ مشروعًا جديدًا أو حدد ملفًا موجودًا.',
+    noFileSelected: 'حدد ملفًا من القائمة أو أنشئ ملفًا جديدًا للبدء.',
     fileSavedSuccess: 'تم حفظ الملف بنجاح.',
     noActiveFile: 'الرجاء تحديد ملف أولاً.',
     saveButton: 'حفظ',
     createProjectButton: 'إنشاء',
+    menu: 'القائمة',
   },
   en: {
     title: 'Question Extractor',
@@ -244,9 +247,9 @@ const translations = {
     successToastTitle: 'Success',
     successToastDescription: 'New questions added successfully.',
     extractedQuestionsTitle: 'Question Bank',
-    noQuestionsYet: 'No questions extracted yet.',
+    noQuestionsYet: 'No questions in this file yet.',
     noQuestionsDescription:
-      'Get started by pasting text or uploading a document, then save them to a new file.',
+      'Use the right panel to add new questions.',
     addNewTextCardTitle: 'Add New Questions',
     uploadFileButton: 'Upload File (Image or PDF)',
     orSeparator: 'or',
@@ -270,8 +273,8 @@ const translations = {
     newFile: 'New File',
     rename: 'Rename',
     delete: 'Delete',
-    enterFolderName: 'Enter folder name',
-    enterFileName: 'Enter file name',
+    enterFolderName: 'Enter folder name (e.g., Faculty of Medicine)',
+    enterFileName: 'Enter course name (e.g., Anatomy)',
     deleteItemConfirmTitle: 'Are you sure you want to delete?',
     deleteItemConfirmDescription:
       'This item and all its contents will be permanently deleted. This action cannot be undone.',
@@ -281,15 +284,16 @@ const translations = {
       'Are you sure you want to continue and discard them?',
     discardChanges: 'Discard',
     unsavedChangesTooltip: 'There are unsaved changes',
-    noFileSelected: 'Start a new project or select an existing file.',
+    noFileSelected: 'Select a file from the list or create a new one to start.',
     fileSavedSuccess: 'File saved successfully.',
     noActiveFile: 'Please select a file first.',
     saveButton: 'Save',
     createProjectButton: 'Create',
+    menu: 'Menu',
   },
 };
 
-export default function QuestionExtractor() {
+function QuestionExtractorComponent() {
   const [text, setText] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -325,35 +329,91 @@ export default function QuestionExtractor() {
 
   const t = translations[language];
   const activeFile = findNode(fileTree, activeFileId) as FileNode | null;
+  const { isMobile, setOpenMobile } = useSidebar();
+
 
   // Load tree from localStorage on mount
   useEffect(() => {
     try {
-      const savedTreeJson = localStorage.getItem(
-        'question-extractor-file-tree'
-      );
-      const savedTree = savedTreeJson ? JSON.parse(savedTreeJson) : [];
-      setFileTree(savedTree);
+      const savedTreeJson = localStorage.getItem('question-extractor-file-tree');
+      const savedExpandedJson = localStorage.getItem('question-extractor-expanded-folders');
+      const savedActiveId = localStorage.getItem('question-extractor-active-file-id');
 
-      const savedActiveId = localStorage.getItem(
-        'question-extractor-active-file-id'
-      );
-      if (savedActiveId) {
-        const fileToLoad = findNode(savedTree, savedActiveId) as FileNode | null;
-        if (fileToLoad) {
-          setActiveFileId(savedActiveId);
-          setQuestions(fileToLoad.questions);
+      if (savedTreeJson) {
+        // If there is saved data, load it.
+        const savedTree = JSON.parse(savedTreeJson);
+        setFileTree(savedTree);
+        if (savedExpandedJson) {
+          setExpandedFolders(new Set(JSON.parse(savedExpandedJson)));
         }
-      }
-      const savedExpanded = localStorage.getItem(
-        'question-extractor-expanded-folders'
-      );
-      if (savedExpanded) {
-        setExpandedFolders(new Set(JSON.parse(savedExpanded)));
+        if (savedActiveId) {
+          const fileToLoad = findNode(savedTree, savedActiveId) as FileNode | null;
+          if (fileToLoad) {
+            setActiveFileId(savedActiveId);
+            setQuestions(fileToLoad.questions);
+          }
+        }
+      } else {
+        // If no saved data, create and set an example structure.
+        const exampleTree: TreeNode[] = [
+          {
+            id: 'stage-1',
+            name: 'المرحلة الجامعية',
+            type: 'folder',
+            children: [
+              {
+                id: 'uni-1',
+                name: 'جامعة حلب',
+                type: 'folder',
+                children: [
+                  {
+                    id: 'faculty-1',
+                    name: 'كلية الطب',
+                    type: 'folder',
+                    children: [
+                       {
+                        id: 'dep-1',
+                        name: 'قسم الطب البشري',
+                        type: 'folder',
+                        children: [
+                          {
+                            id: 'year-1',
+                            name: 'السنة الأولى',
+                            type: 'folder',
+                            children: [
+                              {
+                                id: 'semester-1',
+                                name: 'الفصل الأول',
+                                type: 'folder',
+                                children: [
+                                  {
+                                    id: 'course-1',
+                                    name: 'مادة التشريح',
+                                    type: 'file',
+                                    questions: []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                       }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ];
+        setFileTree(exampleTree);
+        // Automatically expand the folders in the example to make it visible
+        setExpandedFolders(new Set(['stage-1', 'uni-1', 'faculty-1', 'dep-1', 'year-1', 'semester-1']));
       }
     } catch (e) {
       console.error('Failed to load data from localStorage', e);
+      setFileTree([]); // Fallback to empty on any error
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save tree and state to localStorage when they change
@@ -379,12 +439,10 @@ export default function QuestionExtractor() {
   // Check for unsaved changes
   useEffect(() => {
     if (!activeFile) {
-      // If no file is active, any questions in the editor are "dirty"
-      setIsDirty(questions.length > 0);
+      setIsDirty(false);
       return;
     }
     const savedQuestions = activeFile.questions;
-    // Using stringify is a simple but effective way to deep-compare
     if (JSON.stringify(savedQuestions) !== JSON.stringify(questions)) {
       setIsDirty(true);
     } else {
@@ -406,7 +464,7 @@ export default function QuestionExtractor() {
     const file = event.target.files?.[0];
     if (file) {
       setFileName(file.name);
-      setText(''); // Clear text input when a file is selected
+      setText('');
       const reader = new FileReader();
       reader.onload = (loadEvent) => {
         const result = loadEvent.target?.result;
@@ -443,8 +501,16 @@ export default function QuestionExtractor() {
       });
       return;
     }
+    
+    if (!activeFileId) {
+      toast({
+        title: t.errorToastTitle,
+        description: t.noActiveFile,
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    // Set language based on input text, or keep the current language if it's a file
     const detectedLang = text ? detectLanguage(text) : language;
     setLanguage(detectedLang);
 
@@ -460,10 +526,7 @@ export default function QuestionExtractor() {
 
         const result = await extractQuestionsAction(inputPayload);
 
-        // Add new questions to the existing ones in the editor
         setQuestions((prevQuestions) => [...prevQuestions, ...result.questions]);
-
-        // Reset inputs after extraction
         setText('');
         setFileDataUri(null);
         setFileName(null);
@@ -501,7 +564,7 @@ export default function QuestionExtractor() {
     }
     setIsUnsavedChangesDialogOpen(false);
     setNextAction(null);
-    setIsDirty(false); // Changes are discarded, so editor is clean
+    setIsDirty(false);
   };
 
   const handleSelectFile = (fileId: string) => {
@@ -510,7 +573,10 @@ export default function QuestionExtractor() {
       if (fileToLoad && fileToLoad.type === 'file') {
         setActiveFileId(fileId);
         setQuestions(fileToLoad.questions);
-        setIsDirty(false); // Freshly loaded file is clean
+        setIsDirty(false);
+        if (isMobile) {
+          setOpenMobile(false);
+        }
       }
     };
     executeWithUnsavedChangesCheck(action);
@@ -640,7 +706,6 @@ export default function QuestionExtractor() {
           const newOptions = [...q.options];
           newOptions[optionIndex] = newText;
 
-          // If the edited option was the correct answer, update the correct answer as well.
           const newCorrectAnswer =
             q.correctAnswer === oldText ? newText : q.correctAnswer;
 
@@ -664,7 +729,6 @@ export default function QuestionExtractor() {
     ].join(';');
 
     const cleanCsvCell = (text: string): string => {
-      // Ensure text is a string, replace quotes with double quotes, and remove newlines.
       const cleanedText = (text || '')
         .replace(/"/g, '""')
         .replace(/\r?\n/g, ' ');
@@ -673,7 +737,6 @@ export default function QuestionExtractor() {
 
     const rows = questions.map((q) => {
       const options = [...q.options];
-      // Ensure there are always 5 options for consistent CSV structure
       while (options.length < 5) {
         options.push('');
       }
@@ -686,7 +749,7 @@ export default function QuestionExtractor() {
       return rowData.join(';');
     });
 
-    const csvContent = `\uFEFF${headers}\n${rows.join('\n')}`; // \uFEFF for UTF-8 BOM
+    const csvContent = `\uFEFF${headers}\n${rows.join('\n')}`;
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -827,6 +890,42 @@ export default function QuestionExtractor() {
       </div>
     ));
   };
+  
+  const SidebarComponent = (
+    <Sidebar side="right" className="max-w-xs w-full" collapsible="icon">
+      <SidebarHeader>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">{t.fileExplorer}</h2>
+          <SidebarTrigger className="hidden md:block" />
+        </div>
+      </SidebarHeader>
+      <SidebarContent>{renderTree(fileTree, 0)}</SidebarContent>
+      <SidebarFooter className="flex-col gap-2">
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          onClick={() => {
+            setNodeToAddTo(null);
+            setNewNodeInfo({ type: 'folder', name: '' });
+          }}
+        >
+          <FolderPlus className="ml-2 h-4 w-4" />
+          <span>{t.newFolder}</span>
+        </Button>
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          onClick={() => {
+            setNodeToAddTo(null);
+            setNewNodeInfo({ type: 'file', name: '' });
+          }}
+        >
+          <FilePlus className="ml-2 h-4 w-4" />
+          <span>{t.newFile}</span>
+        </Button>
+      </SidebarFooter>
+    </Sidebar>
+  );
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -923,50 +1022,35 @@ export default function QuestionExtractor() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <header className="text-center mb-10">
-        <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">
-          {t.title}
-        </h1>
-        <p className="text-muted-foreground mt-3 text-lg md:text-xl">
-          {t.description}
-        </p>
+      <header className="flex justify-between items-center mb-10">
+        <div className="text-right">
+             <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">
+                {t.title}
+            </h1>
+            <p className="text-muted-foreground mt-3 text-lg md:text-xl">
+                {t.description}
+            </p>
+        </div>
+        <div className="md:hidden">
+           <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Menu className="h-6 w-6" />
+                <span className="sr-only">{t.menu}</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="p-0">
+               {SidebarComponent}
+            </SheetContent>
+          </Sheet>
+        </div>
       </header>
 
       <div className="flex flex-row-reverse gap-8">
-        <Sidebar side="right" variant="sidebar" className="max-w-xs w-full">
-          <SidebarHeader>
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{t.fileExplorer}</h2>
-              <SidebarTrigger className="hidden md:block" />
-            </div>
-          </SidebarHeader>
-          <SidebarContent>{renderTree(fileTree, 0)}</SidebarContent>
-          <SidebarFooter className="flex-row">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => {
-                setNodeToAddTo(null);
-                setNewNodeInfo({ type: 'folder', name: '' });
-              }}
-            >
-              <FolderPlus className="ml-2 h-4 w-4" />
-              {t.newFolder}
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={() => {
-                setNodeToAddTo(null);
-                setNewNodeInfo({ type: 'file', name: '' });
-              }}
-            >
-              <FilePlus className="ml-2 h-4 w-4" />
-              {t.newFile}
-            </Button>
-          </SidebarFooter>
-        </Sidebar>
-
+        <div className="hidden md:block">
+            {SidebarComponent}
+        </div>
+        
         <SidebarInset className="flex-1 min-w-0">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             <div className="xl:col-span-2">
@@ -982,7 +1066,7 @@ export default function QuestionExtractor() {
                           ? activeFile.name
                           : t.extractedQuestionsTitle}
                       </CardTitle>
-                      <SidebarTrigger className="md:hidden" />
+                      
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
@@ -1001,7 +1085,7 @@ export default function QuestionExtractor() {
                       <Button
                         variant="outline"
                         onClick={handleAddQuestion}
-                        disabled={isPending}
+                        disabled={isPending || !activeFileId}
                       >
                         <PlusCircle className="mr-2 h-4 w-4" />
                         {t.addNewQuestionButton}
@@ -1096,7 +1180,7 @@ export default function QuestionExtractor() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {questions.length > 0 || isPending ? (
+                  {activeFileId && (questions.length > 0 || isPending) ? (
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
@@ -1239,23 +1323,15 @@ export default function QuestionExtractor() {
                         </TableBody>
                       </Table>
                     </div>
-                  ) : !activeFileId ? (
-                    <div className="text-center text-muted-foreground p-12 space-y-3">
-                      <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                      <h3 className="text-xl font-semibold text-foreground">
-                        {t.noFileSelected}
-                      </h3>
-                      <p>{t.noQuestionsDescription}</p>
+                   ) : (
+                    <div className="text-center text-muted-foreground p-12 space-y-3 h-full flex flex-col justify-center items-center">
+                        <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                        <h3 className="text-xl font-semibold text-foreground">
+                            {activeFileId ? t.noQuestionsYet : t.noFileSelected}
+                        </h3>
+                        <p>{activeFileId ? t.noQuestionsDescription : t.noFileSelected}</p>
                     </div>
-                  ) : (
-                    <div className="text-center text-muted-foreground p-12 space-y-3">
-                      <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                      <h3 className="text-xl font-semibold text-foreground">
-                        {t.noQuestionsYet}
-                      </h3>
-                      <p>{t.noQuestionsDescription}</p>
-                    </div>
-                  )}
+                )}
                 </CardContent>
               </Card>
             </div>
@@ -1274,6 +1350,7 @@ export default function QuestionExtractor() {
                     onChange={handleTextChange}
                     className="min-h-[150px] text-base focus-visible:ring-primary"
                     dir={detectLanguage(text) === 'ar' ? 'rtl' : 'ltr'}
+                    disabled={!activeFileId}
                   />
 
                   <div className="relative my-4 flex items-center justify-center">
@@ -1291,12 +1368,13 @@ export default function QuestionExtractor() {
                     onChange={handleFileChange}
                     className="hidden"
                     accept="application/pdf,image/png,image/jpeg"
+                    disabled={!activeFileId}
                   />
                   <Button
                     onClick={() => fileInputRef.current?.click()}
                     variant="outline"
                     className="w-full"
-                    disabled={isPending}
+                    disabled={isPending || !activeFileId}
                   >
                     <Upload className="mr-2 h-4 w-4" />
                     {fileName || t.uploadFileButton}
@@ -1304,7 +1382,7 @@ export default function QuestionExtractor() {
 
                   <Button
                     onClick={handleAnalyze}
-                    disabled={isPending || (!text.trim() && !fileDataUri)}
+                    disabled={isPending || (!text.trim() && !fileDataUri) || !activeFileId}
                     className="mt-6 w-full"
                     size="lg"
                   >
@@ -1325,4 +1403,13 @@ export default function QuestionExtractor() {
       </div>
     </div>
   );
+}
+
+
+export default function QuestionExtractor() {
+  return (
+    <SidebarProvider>
+      <QuestionExtractorComponent />
+    </SidebarProvider>
+  )
 }
