@@ -56,7 +56,7 @@ import {
   FolderOpen,
   FolderPlus,
   FilePlus,
-  ChevronRight
+  ChevronRight,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -84,7 +84,7 @@ type Question = {
 
 type FileNode = {
   id: string;
-  name:string;
+  name: string;
   type: 'file';
   questions: Question[];
 };
@@ -94,7 +94,7 @@ type FolderNode = {
   name: string;
   type: 'folder';
   children: TreeNode[];
-}
+};
 
 type TreeNode = FileNode | FolderNode;
 
@@ -111,23 +111,29 @@ const findNode = (nodes: TreeNode[], nodeId: string | null): TreeNode | null => 
   return null;
 };
 
-const updateNodeInTree = (nodes: TreeNode[], nodeId: string, updates: Partial<TreeNode>): TreeNode[] => {
-  return nodes.map(node => {
-    if (node.id === nodeId) {
-      return { ...node, ...updates };
-    }
-    if (node.type === 'folder' && node.children) {
-      const newChildren = updateNodeInTree(node.children, nodeId, updates);
-      if (newChildren !== node.children) {
-        return { ...node, children: newChildren };
+const updateNodeInTree = (
+  nodes: TreeNode[],
+  nodeId: string,
+  updates: Partial<TreeNode>
+): TreeNode[] => {
+  return nodes
+    .map((node) => {
+      if (node.id === nodeId) {
+        return { ...node, ...updates };
       }
-    }
-    return node;
-  }).filter(Boolean) as TreeNode[];
+      if (node.type === 'folder' && node.children) {
+        const newChildren = updateNodeInTree(node.children, nodeId, updates);
+        if (newChildren !== node.children) {
+          return { ...node, children: newChildren };
+        }
+      }
+      return node;
+    })
+    .filter(Boolean) as TreeNode[];
 };
 
 const deleteNodeFromTree = (nodes: TreeNode[], nodeId: string): TreeNode[] => {
-  return nodes.filter(node => {
+  return nodes.filter((node) => {
     if (node.id === nodeId) return false;
     if (node.type === 'folder' && node.children) {
       node.children = deleteNodeFromTree(node.children, nodeId);
@@ -136,16 +142,23 @@ const deleteNodeFromTree = (nodes: TreeNode[], nodeId: string): TreeNode[] => {
   });
 };
 
-const addNodeToTree = (nodes: TreeNode[], parentId: string | null, newNode: TreeNode): TreeNode[] => {
+const addNodeToTree = (
+  nodes: TreeNode[],
+  parentId: string | null,
+  newNode: TreeNode
+): TreeNode[] => {
   if (parentId === null) {
     return [...nodes, newNode];
   }
-  return nodes.map(node => {
+  return nodes.map((node) => {
     if (node.id === parentId && node.type === 'folder') {
       return { ...node, children: [...node.children, newNode] };
     }
     if (node.type === 'folder' && node.children) {
-      return { ...node, children: addNodeToTree(node.children, parentId, newNode) };
+      return {
+        ...node,
+        children: addNodeToTree(node.children, parentId, newNode),
+      };
     }
     return node;
   });
@@ -155,7 +168,7 @@ const translations = {
   ar: {
     title: 'مُستخرِج الأسئلة',
     description: 'حوّل نصوصك ومستنداتك إلى اختبارات تفاعلية ببضع نقرات.',
-    textAreaPlaceholder: 'الصق النص هنا...',
+    textAreaPlaceholder: 'الصق النص هنا أو ارفع ملفًا للبدء...',
     analyzeButton: 'استخراج الأسئلة',
     analyzingButton: 'جاري الاستخراج...',
     downloadButton: 'تصدير',
@@ -171,7 +184,8 @@ const translations = {
     successToastDescription: 'تمت إضافة الأسئلة الجديدة بنجاح.',
     extractedQuestionsTitle: 'بنك الأسئلة',
     noQuestionsYet: 'لم يتم استخراج أي أسئلة بعد.',
-    noQuestionsDescription: 'ابدأ باختيار ملف، أو لصق نص أو رفع مستند.',
+    noQuestionsDescription:
+      'ابدأ بلصق نص أو رفع مستند، ثم احفظهم في ملف جديد.',
     addNewTextCardTitle: 'إضافة أسئلة جديدة',
     uploadFileButton: 'رفع ملف (صورة أو PDF)',
     orSeparator: 'أو',
@@ -190,23 +204,24 @@ const translations = {
       'سيؤدي هذا الإجراء إلى حذف جميع الأسئلة في الملف الحالي بشكل دائم.',
     clearAllDialogCancel: 'إلغاء',
     clearAllDialogConfirm: 'تأكيد الحذف',
-    fileExplorer: "مستكشف الملفات",
-    newFolder: "مجلد جديد",
-    newFile: "ملف جديد",
-    rename: "إعادة تسمية",
-    delete: "حذف",
-    enterFolderName: "أدخل اسم المجلد",
-    enterFileName: "أدخل اسم الملف",
-    deleteItemConfirmTitle: "هل أنت متأكد من الحذف؟",
-    deleteItemConfirmDescription: "سيتم حذف هذا العنصر وجميع محتوياته بشكل دائم. لا يمكن التراجع عن هذا الإجراء.",
-    saveFile: "حفظ الملف",
-    unsavedChangesTitle: "لديك تغييرات غير محفوظة",
-    unsavedChangesDescription: "هل تريد المتابعة وتجاهل التغييرات؟",
-    discardChanges: "تجاهل",
-    unsavedChangesTooltip: "توجد تغييرات غير محفوظة",
+    fileExplorer: 'مستكشف الملفات',
+    newFolder: 'مجلد جديد',
+    newFile: 'ملف جديد',
+    rename: 'إعادة تسمية',
+    delete: 'حذف',
+    enterFolderName: 'أدخل اسم المجلد',
+    enterFileName: 'أدخل اسم الملف',
+    deleteItemConfirmTitle: 'هل أنت متأكد من الحذف؟',
+    deleteItemConfirmDescription:
+      'سيتم حذف هذا العنصر وجميع محتوياته بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
+    saveFile: 'حفظ الملف',
+    unsavedChangesTitle: 'لديك تغييرات غير محفوظة',
+    unsavedChangesDescription: 'هل تريد المتابعة وتجاهل التغييرات؟',
+    discardChanges: 'تجاهل',
+    unsavedChangesTooltip: 'توجد تغييرات غير محفوظة',
     noFileSelected: 'ابدأ مشروعًا جديدًا أو حدد ملفًا موجودًا.',
     fileSavedSuccess: 'تم حفظ الملف بنجاح.',
-    noActiveFile: "الرجاء تحديد ملف أولاً.",
+    noActiveFile: 'الرجاء تحديد ملف أولاً.',
     saveButton: 'حفظ',
     createProjectButton: 'إنشاء',
   },
@@ -214,7 +229,7 @@ const translations = {
     title: 'Question Extractor',
     description:
       'Turn your texts and documents into interactive quizzes with a few clicks.',
-    textAreaPlaceholder: 'Paste your text here...',
+    textAreaPlaceholder: 'Paste text here or upload a file to start...',
     analyzeButton: 'Extract Questions',
     analyzingButton: 'Extracting...',
     downloadButton: 'Export',
@@ -230,7 +245,8 @@ const translations = {
     successToastDescription: 'New questions added successfully.',
     extractedQuestionsTitle: 'Question Bank',
     noQuestionsYet: 'No questions extracted yet.',
-    noQuestionsDescription: 'Get started by selecting a file, or by pasting text or uploading a document.',
+    noQuestionsDescription:
+      'Get started by pasting text or uploading a document, then save them to a new file.',
     addNewTextCardTitle: 'Add New Questions',
     uploadFileButton: 'Upload File (Image or PDF)',
     orSeparator: 'or',
@@ -249,24 +265,25 @@ const translations = {
       'This action will permanently delete all questions in the current file.',
     clearAllDialogCancel: 'Cancel',
     clearAllDialogConfirm: 'Confirm Delete',
-    fileExplorer: "File Explorer",
-    newFolder: "New Folder",
-    newFile: "New File",
-    rename: "Rename",
-    delete: "Delete",
-    enterFolderName: "Enter folder name",
-    enterFileName: "Enter file name",
-    deleteItemConfirmTitle: "Are you sure you want to delete?",
-    deleteItemConfirmDescription: "This item and all its contents will be permanently deleted. This action cannot be undone.",
-    saveFile: "Save File",
-    unsavedChangesTitle: "You have unsaved changes",
+    fileExplorer: 'File Explorer',
+    newFolder: 'New Folder',
+    newFile: 'New File',
+    rename: 'Rename',
+    delete: 'Delete',
+    enterFolderName: 'Enter folder name',
+    enterFileName: 'Enter file name',
+    deleteItemConfirmTitle: 'Are you sure you want to delete?',
+    deleteItemConfirmDescription:
+      'This item and all its contents will be permanently deleted. This action cannot be undone.',
+    saveFile: 'Save File',
+    unsavedChangesTitle: 'You have unsaved changes',
     unsavedChangesDescription:
-      "Are you sure you want to continue and discard them?",
-    discardChanges: "Discard",
-    unsavedChangesTooltip: "There are unsaved changes",
-    noFileSelected: "Start a new project or select an existing file.",
-    fileSavedSuccess: "File saved successfully.",
-    noActiveFile: "Please select a file first.",
+      'Are you sure you want to continue and discard them?',
+    discardChanges: 'Discard',
+    unsavedChangesTooltip: 'There are unsaved changes',
+    noFileSelected: 'Start a new project or select an existing file.',
+    fileSavedSuccess: 'File saved successfully.',
+    noActiveFile: 'Please select a file first.',
     saveButton: 'Save',
     createProjectButton: 'Create',
   },
@@ -288,17 +305,23 @@ export default function QuestionExtractor() {
   // File System State
   const [fileTree, setFileTree] = useState<TreeNode[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(
+    new Set()
+  );
   const [isDirty, setIsDirty] = useState(false);
 
   // Dialog states
   const [nodeToRename, setNodeToRename] = useState<TreeNode | null>(null);
   const [newNodeName, setNewNodeName] = useState('');
   const [nodeToDelete, setNodeToDelete] = useState<TreeNode | null>(null);
-  const [isUnsavedChangesDialogOpen, setIsUnsavedChangesDialogOpen] = useState(false);
+  const [isUnsavedChangesDialogOpen, setIsUnsavedChangesDialogOpen] =
+    useState(false);
   const [nextAction, setNextAction] = useState<(() => void) | null>(null);
   const [nodeToAddTo, setNodeToAddTo] = useState<FolderNode | null>(null);
-  const [newNodeInfo, setNewNodeInfo] = useState<{type: 'file' | 'folder', name: string} | null>(null);
+  const [newNodeInfo, setNewNodeInfo] = useState<{
+    type: 'file' | 'folder';
+    name: string;
+  } | null>(null);
 
   const t = translations[language];
   const activeFile = findNode(fileTree, activeFileId) as FileNode | null;
@@ -306,19 +329,25 @@ export default function QuestionExtractor() {
   // Load tree from localStorage on mount
   useEffect(() => {
     try {
-      const savedTreeJson = localStorage.getItem('question-extractor-file-tree');
+      const savedTreeJson = localStorage.getItem(
+        'question-extractor-file-tree'
+      );
       const savedTree = savedTreeJson ? JSON.parse(savedTreeJson) : [];
       setFileTree(savedTree);
-      
-      const savedActiveId = localStorage.getItem('question-extractor-active-file-id');
+
+      const savedActiveId = localStorage.getItem(
+        'question-extractor-active-file-id'
+      );
       if (savedActiveId) {
         const fileToLoad = findNode(savedTree, savedActiveId) as FileNode | null;
-         if (fileToLoad) {
-            setActiveFileId(savedActiveId);
-            setQuestions(fileToLoad.questions);
-         }
+        if (fileToLoad) {
+          setActiveFileId(savedActiveId);
+          setQuestions(fileToLoad.questions);
+        }
       }
-      const savedExpanded = localStorage.getItem('question-extractor-expanded-folders');
+      const savedExpanded = localStorage.getItem(
+        'question-extractor-expanded-folders'
+      );
       if (savedExpanded) {
         setExpandedFolders(new Set(JSON.parse(savedExpanded)));
       }
@@ -341,22 +370,27 @@ export default function QuestionExtractor() {
   }, [activeFileId]);
 
   useEffect(() => {
-    localStorage.setItem('question-extractor-expanded-folders', JSON.stringify(Array.from(expandedFolders)));
+    localStorage.setItem(
+      'question-extractor-expanded-folders',
+      JSON.stringify(Array.from(expandedFolders))
+    );
   }, [expandedFolders]);
 
   // Check for unsaved changes
   useEffect(() => {
     if (!activeFile) {
+      // If no file is active, any questions in the editor are "dirty"
       setIsDirty(questions.length > 0);
       return;
     }
     const savedQuestions = activeFile.questions;
+    // Using stringify is a simple but effective way to deep-compare
     if (JSON.stringify(savedQuestions) !== JSON.stringify(questions)) {
-        setIsDirty(true);
+      setIsDirty(true);
     } else {
-        setIsDirty(false);
+      setIsDirty(false);
     }
-  }, [questions, activeFile, activeFileId]);
+  }, [questions, activeFile]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -372,7 +406,7 @@ export default function QuestionExtractor() {
     const file = event.target.files?.[0];
     if (file) {
       setFileName(file.name);
-      setText(''); // Clear text input
+      setText(''); // Clear text input when a file is selected
       const reader = new FileReader();
       reader.onload = (loadEvent) => {
         const result = loadEvent.target?.result;
@@ -410,6 +444,7 @@ export default function QuestionExtractor() {
       return;
     }
 
+    // Set language based on input text, or keep the current language if it's a file
     const detectedLang = text ? detectLanguage(text) : language;
     setLanguage(detectedLang);
 
@@ -424,12 +459,11 @@ export default function QuestionExtractor() {
         }
 
         const result = await extractQuestionsAction(inputPayload);
-        setQuestions((prevQuestions) => [
-          ...prevQuestions,
-          ...result.questions,
-        ]);
 
-        // Reset inputs
+        // Add new questions to the existing ones in the editor
+        setQuestions((prevQuestions) => [...prevQuestions, ...result.questions]);
+
+        // Reset inputs after extraction
         setText('');
         setFileDataUri(null);
         setFileName(null);
@@ -460,89 +494,97 @@ export default function QuestionExtractor() {
       action();
     }
   };
-  
+
   const handleConfirmDiscardChanges = () => {
     if (nextAction) {
       nextAction();
     }
     setIsUnsavedChangesDialogOpen(false);
     setNextAction(null);
-    setIsDirty(false);
+    setIsDirty(false); // Changes are discarded, so editor is clean
   };
 
   const handleSelectFile = (fileId: string) => {
     const action = () => {
-        const fileToLoad = findNode(fileTree, fileId) as FileNode | null;
-        if (fileToLoad && fileToLoad.type === 'file') {
-            setActiveFileId(fileId);
-            setQuestions(fileToLoad.questions);
-            setIsDirty(false);
-        }
+      const fileToLoad = findNode(fileTree, fileId) as FileNode | null;
+      if (fileToLoad && fileToLoad.type === 'file') {
+        setActiveFileId(fileId);
+        setQuestions(fileToLoad.questions);
+        setIsDirty(false); // Freshly loaded file is clean
+      }
     };
     executeWithUnsavedChangesCheck(action);
   };
 
   const handleToggleFolder = (folderId: string) => {
-    setExpandedFolders(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(folderId)) {
-            newSet.delete(folderId);
-        } else {
-            newSet.add(folderId);
-        }
-        return newSet;
+    setExpandedFolders((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
     });
   };
 
   const handleSaveFile = () => {
     if (!activeFileId) {
-      toast({ title: t.errorToastTitle, description: t.noActiveFile, variant: 'destructive' });
+      toast({
+        title: t.errorToastTitle,
+        description: t.noActiveFile,
+        variant: 'destructive',
+      });
       return;
     }
-    setFileTree(prevTree => updateNodeInTree(prevTree, activeFileId, { questions }));
+    setFileTree((prevTree) =>
+      updateNodeInTree(prevTree, activeFileId, { questions })
+    );
     toast({ title: t.successToastTitle, description: t.fileSavedSuccess });
     setIsDirty(false);
   };
-  
+
   const handleAddNewNode = () => {
     if (!newNodeInfo) return;
     const { type, name } = newNodeInfo;
     const parentId = nodeToAddTo?.id || null;
-    
+
     if (!name.trim()) return;
 
-    const newNode: TreeNode = type === 'file'
-      ? { id: Date.now().toString(), name, type: 'file', questions: [] }
-      : { id: Date.now().toString(), name, type: 'folder', children: [] };
+    const newNode: TreeNode =
+      type === 'file'
+        ? { id: Date.now().toString(), name, type: 'file', questions: [] }
+        : { id: Date.now().toString(), name, type: 'folder', children: [] };
 
-    setFileTree(prevTree => addNodeToTree(prevTree, parentId, newNode));
-    
-    if(parentId) {
-        setExpandedFolders(prev => new Set(prev).add(parentId));
+    setFileTree((prevTree) => addNodeToTree(prevTree, parentId, newNode));
+
+    if (parentId) {
+      setExpandedFolders((prev) => new Set(prev).add(parentId));
     }
-    
+
     setNodeToAddTo(null);
     setNewNodeInfo(null);
   };
 
   const handleRenameNode = () => {
     if (!nodeToRename || !newNodeName.trim()) return;
-    setFileTree(prevTree => updateNodeInTree(prevTree, nodeToRename.id, { name: newNodeName }));
+    setFileTree((prevTree) =>
+      updateNodeInTree(prevTree, nodeToRename.id, { name: newNodeName })
+    );
     setNodeToRename(null);
     setNewNodeName('');
   };
 
   const handleDeleteNode = () => {
     if (!nodeToDelete) return;
-    setFileTree(prevTree => deleteNodeFromTree(prevTree, nodeToDelete.id));
+    setFileTree((prevTree) => deleteNodeFromTree(prevTree, nodeToDelete.id));
     if (activeFileId === nodeToDelete.id) {
-        setActiveFileId(null);
-        setQuestions([]);
-        setIsDirty(false);
+      setActiveFileId(null);
+      setQuestions([]);
+      setIsDirty(false);
     }
     setNodeToDelete(null);
   };
-
 
   const handleAddQuestion = () => {
     const newQuestion: Question = {
@@ -598,6 +640,7 @@ export default function QuestionExtractor() {
           const newOptions = [...q.options];
           newOptions[optionIndex] = newText;
 
+          // If the edited option was the correct answer, update the correct answer as well.
           const newCorrectAnswer =
             q.correctAnswer === oldText ? newText : q.correctAnswer;
 
@@ -621,6 +664,7 @@ export default function QuestionExtractor() {
     ].join(';');
 
     const cleanCsvCell = (text: string): string => {
+      // Ensure text is a string, replace quotes with double quotes, and remove newlines.
       const cleanedText = (text || '')
         .replace(/"/g, '""')
         .replace(/\r?\n/g, ' ');
@@ -629,6 +673,7 @@ export default function QuestionExtractor() {
 
     const rows = questions.map((q) => {
       const options = [...q.options];
+      // Ensure there are always 5 options for consistent CSV structure
       while (options.length < 5) {
         options.push('');
       }
@@ -641,7 +686,7 @@ export default function QuestionExtractor() {
       return rowData.join(';');
     });
 
-    const csvContent = `\uFEFF${headers}\n${rows.join('\n')}`;
+    const csvContent = `\uFEFF${headers}\n${rows.join('\n')}`; // \uFEFF for UTF-8 BOM
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -651,10 +696,12 @@ export default function QuestionExtractor() {
     link.click();
     document.body.removeChild(link);
   };
-  
+
   const executeJsonDownload = (fileNameToDownload: string) => {
     const jsonContent = JSON.stringify(questions, null, 2);
-    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+    const blob = new Blob([jsonContent], {
+      type: 'application/json;charset=utf-8;',
+    });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
@@ -676,121 +723,206 @@ export default function QuestionExtractor() {
     if (format === 'csv') {
       executeCsvDownload(downloadFileName);
     } else {
-      executeJsonDownload(downloadFileName)
+      executeJsonDownload(downloadFileName);
     }
     setIsDownloadDialogOpen(false);
   };
 
   const renderTree = (nodes: TreeNode[], level: number): React.ReactNode => {
     return nodes.map((node) => (
-      <div key={node.id} style={{ paddingRight: `${level * 1.25}rem` }} className="pl-0">
-        <div className={cn(
-            "flex items-center justify-between group rounded-md hover:bg-muted",
-            activeFileId === node.id && "bg-accent text-accent-foreground"
-        )}>
+      <div
+        key={node.id}
+        style={{ paddingRight: `${level * 1.25}rem` }}
+        className="pl-0"
+      >
+        <div
+          className={cn(
+            'flex items-center justify-between group rounded-md hover:bg-muted',
+            activeFileId === node.id && 'bg-accent text-accent-foreground'
+          )}
+        >
           <button
-            onClick={() => node.type === 'folder' ? handleToggleFolder(node.id) : handleSelectFile(node.id)}
+            onClick={() =>
+              node.type === 'folder'
+                ? handleToggleFolder(node.id)
+                : handleSelectFile(node.id)
+            }
             className="flex-grow flex items-center gap-2 p-2 text-sm text-right"
           >
             {node.type === 'folder' ? (
               <>
-                <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-200", expandedFolders.has(node.id) && "rotate-90")}/>
-                {expandedFolders.has(node.id) ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
+                <ChevronRight
+                  className={cn(
+                    'h-4 w-4 shrink-0 transition-transform duration-200',
+                    expandedFolders.has(node.id) && 'rotate-90'
+                  )}
+                />
+                {expandedFolders.has(node.id) ? (
+                  <FolderOpen className="h-4 w-4" />
+                ) : (
+                  <Folder className="h-4 w-4" />
+                )}
               </>
-            ) : <FileText className="h-4 w-4 mr-1" />}
+            ) : (
+              <FileText className="h-4 w-4 mr-1" />
+            )}
             <span className="truncate">{node.name}</span>
           </button>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-50 group-hover:opacity-100">
-                    <MoreVertical className="h-4 w-4" />
-                </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 opacity-50 group-hover:opacity-100"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
               {node.type === 'folder' && (
                 <>
-                 <DropdownMenuItem onSelect={() => {setNodeToAddTo(node); setNewNodeInfo({type: 'folder', name: ''})}}>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setNodeToAddTo(node);
+                      setNewNodeInfo({ type: 'folder', name: '' });
+                    }}
+                  >
                     <FolderPlus className="ml-2 h-4 w-4" />
                     <span>{t.newFolder}</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => {setNodeToAddTo(node); setNewNodeInfo({type: 'file', name: ''})}}>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setNodeToAddTo(node);
+                      setNewNodeInfo({ type: 'file', name: '' });
+                    }}
+                  >
                     <FilePlus className="ml-2 h-4 w-4" />
                     <span>{t.newFile}</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onSelect={() => { setNodeToRename(node); setNewNodeName(node.name); }}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setNodeToRename(node);
+                  setNewNodeName(node.name);
+                }}
+              >
                 {t.rename}
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setNodeToDelete(node)} className="text-destructive focus:text-destructive">
+              <DropdownMenuItem
+                onSelect={() => setNodeToDelete(node)}
+                className="text-destructive focus:text-destructive"
+              >
                 {t.delete}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {node.type === 'folder' && expandedFolders.has(node.id) && (
-          <div>{renderTree(node.children, level + 1)}</div>
-        )}
+        {node.type === 'folder' &&
+          expandedFolders.has(node.id) && (
+            <div>{renderTree(node.children, level + 1)}</div>
+          )}
       </div>
     ));
   };
 
-
   return (
-   <SidebarProvider>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       {/* DIALOGS */}
-      <AlertDialog open={isUnsavedChangesDialogOpen} onOpenChange={setIsUnsavedChangesDialogOpen}>
+      <AlertDialog
+        open={isUnsavedChangesDialogOpen}
+        onOpenChange={setIsUnsavedChangesDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t.unsavedChangesTitle}</AlertDialogTitle>
-            <AlertDialogDescription>{t.unsavedChangesDescription}</AlertDialogDescription>
+            <AlertDialogDescription>
+              {t.unsavedChangesDescription}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t.clearAllDialogCancel}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDiscardChanges} variant="destructive">
+            <AlertDialogAction
+              onClick={handleConfirmDiscardChanges}
+              variant="destructive"
+            >
               {t.discardChanges}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={!!nodeToRename} onOpenChange={(isOpen) => !isOpen && setNodeToRename(null)}>
+      <Dialog
+        open={!!nodeToRename}
+        onOpenChange={(isOpen) => !isOpen && setNodeToRename(null)}
+      >
         <DialogContent>
-            <DialogHeader><DialogTitle>{t.rename}</DialogTitle></DialogHeader>
-            <Input value={newNodeName} onChange={e => setNewNodeName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleRenameNode()} />
-            <DialogFooter><Button onClick={handleRenameNode}>{t.saveButton}</Button></DialogFooter>
+          <DialogHeader>
+            <DialogTitle>{t.rename}</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newNodeName}
+            onChange={(e) => setNewNodeName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleRenameNode()}
+          />
+          <DialogFooter>
+            <Button onClick={handleRenameNode}>{t.saveButton}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <Dialog open={!!newNodeInfo} onOpenChange={(isOpen) => !isOpen && setNewNodeInfo(null)}>
+
+      <Dialog
+        open={!!newNodeInfo}
+        onOpenChange={(isOpen) => !isOpen && setNewNodeInfo(null)}
+      >
         <DialogContent>
-            <DialogHeader><DialogTitle>{newNodeInfo?.type === 'folder' ? t.newFolder : t.newFile}</DialogTitle></DialogHeader>
-            <Input 
-              value={newNodeInfo?.name || ''} 
-              onChange={e => setNewNodeInfo(prev => prev ? {...prev, name: e.target.value} : null)} 
-              placeholder={newNodeInfo?.type === 'folder' ? t.enterFolderName : t.enterFileName}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddNewNode()} 
-            />
-            <DialogFooter><Button onClick={handleAddNewNode}>{t.createProjectButton}</Button></DialogFooter>
+          <DialogHeader>
+            <DialogTitle>
+              {newNodeInfo?.type === 'folder' ? t.newFolder : t.newFile}
+            </DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newNodeInfo?.name || ''}
+            onChange={(e) =>
+              setNewNodeInfo((prev) =>
+                prev ? { ...prev, name: e.target.value } : null
+              )
+            }
+            placeholder={
+              newNodeInfo?.type === 'folder'
+                ? t.enterFolderName
+                : t.enterFileName
+            }
+            onKeyDown={(e) => e.key === 'Enter' && handleAddNewNode()}
+          />
+          <DialogFooter>
+            <Button onClick={handleAddNewNode}>{t.createProjectButton}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <AlertDialog open={!!nodeToDelete} onOpenChange={(isOpen) => !isOpen && setNodeToDelete(null)}>
+
+      <AlertDialog
+        open={!!nodeToDelete}
+        onOpenChange={(isOpen) => !isOpen && setNodeToDelete(null)}
+      >
         <AlertDialogContent>
-            <AlertDialogHeader>
+          <AlertDialogHeader>
             <AlertDialogTitle>{t.deleteItemConfirmTitle}</AlertDialogTitle>
-            <AlertDialogDescription>{t.deleteItemConfirmDescription}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
+            <AlertDialogDescription>
+              {t.deleteItemConfirmDescription}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
             <AlertDialogCancel>{t.clearAllDialogCancel}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteNode} variant="destructive">{t.delete}</AlertDialogAction>
-            </AlertDialogFooter>
+            <AlertDialogAction onClick={handleDeleteNode} variant="destructive">
+              {t.delete}
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
       <header className="text-center mb-10">
         <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">
           {t.title}
@@ -802,41 +934,69 @@ export default function QuestionExtractor() {
 
       <div className="flex flex-row-reverse gap-8">
         <Sidebar side="right" variant="sidebar" className="max-w-xs w-full">
-            <SidebarHeader>
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold">{t.fileExplorer}</h2>
-                    <SidebarTrigger />
-                </div>
-            </SidebarHeader>
-            <SidebarContent>
-              {renderTree(fileTree, 0)}
-            </SidebarContent>
-            <SidebarFooter className="flex-row">
-                <Button variant="outline" className="flex-1" onClick={() => {setNodeToAddTo(null); setNewNodeInfo({type: 'folder', name: ''})}}>
-                    <FolderPlus className="ml-2 h-4 w-4" />
-                    {t.newFolder}
-                </Button>
-                 <Button variant="outline" className="flex-1" onClick={() => {setNodeToAddTo(null); setNewNodeInfo({type: 'file', name: ''})}}>
-                    <FilePlus className="ml-2 h-4 w-4" />
-                    {t.newFile}
-                </Button>
-            </SidebarFooter>
+          <SidebarHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">{t.fileExplorer}</h2>
+              <SidebarTrigger className="hidden md:block" />
+            </div>
+          </SidebarHeader>
+          <SidebarContent>{renderTree(fileTree, 0)}</SidebarContent>
+          <SidebarFooter className="flex-row">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setNodeToAddTo(null);
+                setNewNodeInfo({ type: 'folder', name: '' });
+              }}
+            >
+              <FolderPlus className="ml-2 h-4 w-4" />
+              {t.newFolder}
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setNodeToAddTo(null);
+                setNewNodeInfo({ type: 'file', name: '' });
+              }}
+            >
+              <FilePlus className="ml-2 h-4 w-4" />
+              {t.newFile}
+            </Button>
+          </SidebarFooter>
         </Sidebar>
-        
+
         <SidebarInset className="flex-1 min-w-0">
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             <div className="xl:col-span-2">
               <Card className="shadow-sm border h-full">
                 <CardHeader>
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <CardTitle className="font-headline text-2xl truncate" title={activeFile?.name || t.extractedQuestionsTitle}>
-                      {activeFile ? activeFile.name : t.extractedQuestionsTitle}
-                    </CardTitle>
+                    <div className="flex items-center justify-between w-full md:w-auto gap-4">
+                      <CardTitle
+                        className="font-headline text-2xl truncate"
+                        title={activeFile?.name || t.extractedQuestionsTitle}
+                      >
+                        {activeFile
+                          ? activeFile.name
+                          : t.extractedQuestionsTitle}
+                      </CardTitle>
+                      <SidebarTrigger className="md:hidden" />
+                    </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <Button onClick={handleSaveFile} disabled={!activeFileId || !isDirty || isPending}>
+                      <Button
+                        onClick={handleSaveFile}
+                        disabled={!activeFileId || !isDirty || isPending}
+                      >
                         <Save className="mr-2 h-4 w-4" />
                         {t.saveFile}
-                        {isDirty && <span className="ml-2 h-2 w-2 rounded-full bg-destructive animate-pulse" title={t.unsavedChangesTooltip}></span>}
+                        {isDirty && (
+                          <span
+                            className="ml-2 h-2 w-2 rounded-full bg-destructive animate-pulse"
+                            title={t.unsavedChangesTooltip}
+                          ></span>
+                        )}
                       </Button>
                       <Button
                         variant="outline"
@@ -860,7 +1020,9 @@ export default function QuestionExtractor() {
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-[425px]">
                               <DialogHeader>
-                                <DialogTitle>{t.downloadDialogTitle}</DialogTitle>
+                                <DialogTitle>
+                                  {t.downloadDialogTitle}
+                                </DialogTitle>
                                 <DialogDescription>
                                   {t.downloadDialogDescription}
                                 </DialogDescription>
@@ -884,10 +1046,15 @@ export default function QuestionExtractor() {
                                 </div>
                               </div>
                               <DialogFooter>
-                                <Button onClick={() => handleConfirmDownload('csv')}>
+                                <Button
+                                  onClick={() => handleConfirmDownload('csv')}
+                                >
                                   {t.downloadCsvButton}
                                 </Button>
-                                <Button onClick={() => handleConfirmDownload('json')} variant="secondary">
+                                <Button
+                                  onClick={() => handleConfirmDownload('json')}
+                                  variant="secondary"
+                                >
                                   {t.downloadJsonButton}
                                 </Button>
                               </DialogFooter>
@@ -940,7 +1107,9 @@ export default function QuestionExtractor() {
                             </TableHead>
                             <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
                             <TableHead>{t.tableHeaderExplanation}</TableHead>
-                            <TableHead className="w-[50px] text-center">{t.tableHeaderActions}</TableHead>
+                            <TableHead className="w-[50px] text-center">
+                              {t.tableHeaderActions}
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -962,58 +1131,63 @@ export default function QuestionExtractor() {
                               </TableCell>
                               {Array.from({ length: 5 }).map((_, oIndex) => {
                                 const optionText = q.options[oIndex] ?? '';
-                                const isCorrect = q.correctAnswer === optionText && optionText !== '';
+                                const isCorrect =
+                                  q.correctAnswer === optionText &&
+                                  optionText !== '';
 
                                 return (
-                                  <TableCell key={oIndex} className="p-1 align-top">
-                                      <Label
-                                        htmlFor={`q${qIndex}-o${oIndex}`}
+                                  <TableCell
+                                    key={oIndex}
+                                    className="p-1 align-top"
+                                  >
+                                    <Label
+                                      htmlFor={`q${qIndex}-o${oIndex}`}
+                                      className={cn(
+                                        'flex items-start w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors',
+                                        isCorrect
+                                          ? 'bg-accent/80'
+                                          : 'hover:bg-muted'
+                                      )}
+                                    >
+                                      <input
+                                        type="radio"
+                                        id={`q${qIndex}-o${oIndex}`}
+                                        name={`question-${qIndex}`}
+                                        value={optionText}
+                                        checked={isCorrect}
+                                        onChange={() =>
+                                          handleCorrectAnswerChange(
+                                            qIndex,
+                                            optionText
+                                          )
+                                        }
+                                        className="sr-only"
+                                      />
+                                      <div
                                         className={cn(
-                                          'flex items-start w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors',
+                                          'mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all',
                                           isCorrect
-                                            ? 'bg-accent/80'
-                                            : 'hover:bg-muted'
+                                            ? 'border-primary bg-primary'
+                                            : 'border-muted-foreground'
                                         )}
                                       >
-                                        <input
-                                          type="radio"
-                                          id={`q${qIndex}-o${oIndex}`}
-                                          name={`question-${qIndex}`}
-                                          value={optionText}
-                                          checked={isCorrect}
-                                          onChange={() =>
-                                            handleCorrectAnswerChange(
-                                              qIndex,
-                                              optionText
-                                            )
-                                          }
-                                          className="sr-only"
-                                        />
-                                        <div
-                                          className={cn(
-                                            'mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all',
-                                            isCorrect
-                                              ? 'border-primary bg-primary'
-                                              : 'border-muted-foreground'
-                                          )}
-                                        >
-                                          {isCorrect && (
-                                            <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>
-                                          )}
-                                        </div>
-                                        <Textarea
-                                          value={optionText}
-                                          onChange={(e) =>
-                                            handleOptionChange(
-                                              qIndex,
-                                              oIndex,
-                                              e.target.value
-                                            )
-                                          }
-                                          className="flex-grow min-w-[150px] bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary p-0 text-sm resize-none"
-                                          rows={2}
-                                        />
-                                      </Label>
+                                        {isCorrect && (
+                                          <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>
+                                        )}
+                                      </div>
+                                      <Textarea
+                                        value={optionText}
+                                        onChange={(e) =>
+                                          handleOptionChange(
+                                            qIndex,
+                                            oIndex,
+                                            e.target.value
+                                          )
+                                        }
+                                        className="flex-grow min-w-[150px] bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary p-0 text-sm resize-none"
+                                        rows={2}
+                                      />
+                                    </Label>
                                   </TableCell>
                                 );
                               })}
@@ -1049,7 +1223,10 @@ export default function QuestionExtractor() {
                           ))}
                           {isPending && (
                             <TableRow>
-                              <TableCell colSpan={9} className="p-8 text-center">
+                              <TableCell
+                                colSpan={9}
+                                className="p-8 text-center"
+                              >
                                 <div className="flex justify-center items-center gap-3">
                                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                                   <span className="text-muted-foreground">
@@ -1063,12 +1240,12 @@ export default function QuestionExtractor() {
                       </Table>
                     </div>
                   ) : !activeFileId ? (
-                     <div className="text-center text-muted-foreground p-12 space-y-3">
-                        <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                        <h3 className="text-xl font-semibold text-foreground">
-                            {t.noFileSelected}
-                        </h3>
-                        <p>{t.noQuestionsDescription}</p>
+                    <div className="text-center text-muted-foreground p-12 space-y-3">
+                      <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                      <h3 className="text-xl font-semibold text-foreground">
+                        {t.noFileSelected}
+                      </h3>
+                      <p>{t.noQuestionsDescription}</p>
                     </div>
                   ) : (
                     <div className="text-center text-muted-foreground p-12 space-y-3">
@@ -1147,6 +1324,5 @@ export default function QuestionExtractor() {
         </SidebarInset>
       </div>
     </div>
-   </SidebarProvider>
   );
 }
