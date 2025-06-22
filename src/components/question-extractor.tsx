@@ -12,6 +12,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Download, FileQuestion, Upload } from 'lucide-react';
 import { extractQuestionsAction } from '@/app/actions';
@@ -49,10 +59,17 @@ const translations = {
     addNewTextCardTitle: 'إضافة أسئلة جديدة',
     uploadFileButton: 'رفع ملف (صورة أو PDF)',
     orSeparator: 'أو',
+    downloadDialogTitle: 'تسمية الملف',
+    downloadDialogDescription:
+      'أدخل اسمًا لملف CSV الخاص بك. سيتم إضافة الامتداد .csv تلقائيًا.',
+    downloadDialogFileNameLabel: 'اسم الملف',
+    downloadDialogSaveButton: 'تنزيل',
+    errorEmptyFileName: 'لا يمكن أن يكون اسم الملف فارغًا.',
   },
   en: {
     title: 'Question Extractor',
-    description: 'Turn your texts and documents into interactive quizzes with a few clicks.',
+    description:
+      'Turn your texts and documents into interactive quizzes with a few clicks.',
     textAreaPlaceholder: 'Paste your text here...',
     analyzeButton: 'Extract Questions',
     analyzingButton: 'Extracting...',
@@ -72,6 +89,12 @@ const translations = {
     addNewTextCardTitle: 'Add New Questions',
     uploadFileButton: 'Upload File (Image or PDF)',
     orSeparator: 'or',
+    downloadDialogTitle: 'Name Your File',
+    downloadDialogDescription:
+      'Enter a name for your CSV file. The .csv extension will be added automatically.',
+    downloadDialogFileNameLabel: 'File Name',
+    downloadDialogSaveButton: 'Download',
+    errorEmptyFileName: 'File name cannot be empty.',
   },
 };
 
@@ -84,6 +107,8 @@ export default function QuestionExtractor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileDataUri, setFileDataUri] = useState<string | null>(null);
+  const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
+  const [downloadFileName, setDownloadFileName] = useState('questions');
 
   const t = translations[language];
 
@@ -111,11 +136,11 @@ export default function QuestionExtractor() {
       };
       reader.onerror = () => {
         toast({
-            title: t.errorToastTitle,
-            description: "Failed to read file.",
-            variant: 'destructive',
-          });
-      }
+          title: t.errorToastTitle,
+          description: 'Failed to read file.',
+          variant: 'destructive',
+        });
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -125,10 +150,9 @@ export default function QuestionExtractor() {
     setFileName(null);
     setFileDataUri(null);
     if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+      fileInputRef.current.value = '';
     }
   };
-
 
   const handleAnalyze = () => {
     if (!text.trim() && !fileDataUri) {
@@ -152,16 +176,19 @@ export default function QuestionExtractor() {
         } else if (fileDataUri) {
           inputPayload.fileDataUri = fileDataUri;
         }
-        
+
         const result = await extractQuestionsAction(inputPayload);
-        setQuestions(prevQuestions => [...prevQuestions, ...result.questions]);
-        
+        setQuestions((prevQuestions) => [
+          ...prevQuestions,
+          ...result.questions,
+        ]);
+
         // Reset inputs
         setText('');
         setFileDataUri(null);
         setFileName(null);
-        if(fileInputRef.current) {
-          fileInputRef.current.value = "";
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
         }
 
         toast({
@@ -171,21 +198,25 @@ export default function QuestionExtractor() {
       } catch (error) {
         toast({
           title: t.errorToastTitle,
-          description: error instanceof Error ? error.message : t.errorToastDescription,
+          description:
+            error instanceof Error ? error.message : t.errorToastDescription,
           variant: 'destructive',
         });
       }
     });
   };
 
-  const handleCorrectAnswerChange = (questionIndex: number, newCorrectAnswer: string) => {
-    setQuestions(prevQuestions =>
+  const handleCorrectAnswerChange = (
+    questionIndex: number,
+    newCorrectAnswer: string
+  ) => {
+    setQuestions((prevQuestions) =>
       prevQuestions.map((q, i) =>
         i === questionIndex ? { ...q, correctAnswer: newCorrectAnswer } : q
       )
     );
   };
-  
+
   const handleQuestionFieldChange = (
     questionIndex: number,
     field: 'question' | 'explanation',
@@ -220,24 +251,30 @@ export default function QuestionExtractor() {
     );
   };
 
-  const handleDownload = () => {
+  const executeDownload = (fileNameToDownload: string) => {
     const headers = [
       `"${t.tableHeaderQuestion}"`,
-      '"Option A"', '"Option B"', '"Option C"', '"Option D"', '"Option E"',
+      '"Option A"',
+      '"Option B"',
+      '"Option C"',
+      '"Option D"',
+      '"Option E"',
       `"${t.tableHeaderCorrectAnswer}"`,
-      `"${t.tableHeaderExplanation}"`
+      `"${t.tableHeaderExplanation}"`,
     ].join(';');
 
-    const rows = questions.map(q => {
+    const rows = questions.map((q) => {
       const options = [...q.options];
       while (options.length < 5) {
         options.push('');
       }
       const rowData = [
         `"${q.question.replace(/"/g, '""')}"`,
-        ...options.slice(0, 5).map(opt => `"${(opt || '').replace(/"/g, '""')}"`),
+        ...options
+          .slice(0, 5)
+          .map((opt) => `"${(opt || '').replace(/"/g, '""')}"`),
         `"${q.correctAnswer.replace(/"/g, '""')}"`,
-        `"${(q.explanation || '').replace(/"/g, '""')}"`
+        `"${(q.explanation || '').replace(/"/g, '""')}"`,
       ];
       return rowData.join(';');
     });
@@ -247,180 +284,294 @@ export default function QuestionExtractor() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', 'questions.csv');
+    link.setAttribute('download', `${fileNameToDownload.trim()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
+  const handleConfirmDownload = () => {
+    if (!downloadFileName.trim()) {
+      toast({
+        title: t.errorToastTitle,
+        description: t.errorEmptyFileName,
+        variant: 'destructive',
+      });
+      return;
+    }
+    executeDownload(downloadFileName);
+    setIsDownloadDialogOpen(false); // Close the dialog
+  };
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <header className="text-center mb-10">
-        <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">{t.title}</h1>
-        <p className="text-muted-foreground mt-3 text-lg md:text-xl">{t.description}</p>
+        <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">
+          {t.title}
+        </h1>
+        <p className="text-muted-foreground mt-3 text-lg md:text-xl">
+          {t.description}
+        </p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
-            <Card className="shadow-sm border h-full">
+          <Card className="shadow-sm border h-full">
             <CardHeader>
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <CardTitle className="font-headline text-2xl">{t.extractedQuestionsTitle}</CardTitle>
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <CardTitle className="font-headline text-2xl">
+                  {t.extractedQuestionsTitle}
+                </CardTitle>
                 {questions.length > 0 && (
-                    <Button onClick={handleDownload} variant="outline" disabled={isPending}>
-                    <Download className="mr-2 h-4 w-4" />
-                    {t.downloadButton}
-                    </Button>
+                  <Dialog
+                    open={isDownloadDialogOpen}
+                    onOpenChange={setIsDownloadDialogOpen}
+                  >
+                    <DialogTrigger asChild>
+                      <Button variant="outline" disabled={isPending}>
+                        <Download className="mr-2 h-4 w-4" />
+                        {t.downloadButton}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                      <DialogHeader>
+                        <DialogTitle>{t.downloadDialogTitle}</DialogTitle>
+                        <DialogDescription>
+                          {t.downloadDialogDescription}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label
+                            htmlFor="filename"
+                            className="text-right rtl:text-left"
+                          >
+                            {t.downloadDialogFileNameLabel}
+                          </Label>
+                          <Input
+                            id="filename"
+                            value={downloadFileName}
+                            onChange={(e) => setDownloadFileName(e.target.value)}
+                            className="col-span-3"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleConfirmDownload();
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button onClick={handleConfirmDownload}>
+                          {t.downloadDialogSaveButton}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 )}
-                </div>
+              </div>
             </CardHeader>
             <CardContent>
-                {questions.length > 0 || isPending ? (
+              {questions.length > 0 || isPending ? (
                 <div className="overflow-x-auto">
-                    <Table>
+                  <Table>
                     <TableHeader>
-                        <TableRow>
-                            <TableHead>{t.tableHeaderQuestion}</TableHead>
-                            <TableHead className="text-center" colSpan={5}>{t.tableHeaderOptions}</TableHead>
-                            <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
-                            <TableHead>{t.tableHeaderExplanation}</TableHead>
-                        </TableRow>
+                      <TableRow>
+                        <TableHead>{t.tableHeaderQuestion}</TableHead>
+                        <TableHead className="text-center" colSpan={5}>
+                          {t.tableHeaderOptions}
+                        </TableHead>
+                        <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
+                        <TableHead>{t.tableHeaderExplanation}</TableHead>
+                      </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {questions.map((q, qIndex) => (
+                      {questions.map((q, qIndex) => (
                         <TableRow key={qIndex}>
-                            <TableCell className="font-medium align-top">
-                                <Textarea
-                                    value={q.question}
-                                    onChange={(e) => handleQuestionFieldChange(qIndex, 'question', e.target.value)}
-                                    rows={2}
-                                    className="w-full min-w-[200px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 resize-none"
-                                />
-                            </TableCell>
-                            {Array.from({ length: 5 }).map((_, oIndex) => {
-                                const optionText = q.options[oIndex];
-                                const isCorrect = q.correctAnswer === optionText;
-                                
-                                return (
-                                    <TableCell key={oIndex} className="p-1 align-top">
-                                    {optionText !== undefined ? (
-                                        <Label
-                                            htmlFor={`q${qIndex}-o${oIndex}`}
-                                            className={cn(
-                                            "flex items-start w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors",
-                                            isCorrect ? 'bg-accent/80' : 'hover:bg-muted'
-                                            )}
-                                        >
-                                            <input
-                                                type="radio"
-                                                id={`q${qIndex}-o${oIndex}`}
-                                                name={`question-${qIndex}`}
-                                                value={optionText}
-                                                checked={isCorrect}
-                                                onChange={() => handleCorrectAnswerChange(qIndex, optionText)}
-                                                className="sr-only"
-                                            />
-                                            <div className={cn("mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all", isCorrect ? "border-primary bg-primary" : "border-muted-foreground")}>
-                                                {isCorrect && <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>}
-                                            </div>
-                                            <Textarea
-                                                value={optionText}
-                                                onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)}
-                                                className="flex-grow min-w-[150px] bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary p-0 text-sm resize-none"
-                                                rows={2}
-                                            />
-                                        </Label>
-                                    ) : <div className="w-full h-full p-2">&nbsp;</div>}
-                                    </TableCell>
-                                );
-                            })}
-                            <TableCell className="font-semibold text-primary align-top min-w-[150px]">{q.correctAnswer}</TableCell>
-                            <TableCell className="align-top">
-                                <Textarea
-                                    value={q.explanation}
-                                    onChange={(e) => handleQuestionFieldChange(qIndex, 'explanation', e.target.value)}
-                                    rows={2}
-                                    className="w-full min-w-[250px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 text-sm text-muted-foreground resize-none"
-                                />
-                            </TableCell>
+                          <TableCell className="font-medium align-top">
+                            <Textarea
+                              value={q.question}
+                              onChange={(e) =>
+                                handleQuestionFieldChange(
+                                  qIndex,
+                                  'question',
+                                  e.target.value
+                                )
+                              }
+                              rows={2}
+                              className="w-full min-w-[200px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 resize-none"
+                            />
+                          </TableCell>
+                          {Array.from({ length: 5 }).map((_, oIndex) => {
+                            const optionText = q.options[oIndex];
+                            const isCorrect = q.correctAnswer === optionText;
+
+                            return (
+                              <TableCell key={oIndex} className="p-1 align-top">
+                                {optionText !== undefined ? (
+                                  <Label
+                                    htmlFor={`q${qIndex}-o${oIndex}`}
+                                    className={cn(
+                                      'flex items-start w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors',
+                                      isCorrect
+                                        ? 'bg-accent/80'
+                                        : 'hover:bg-muted'
+                                    )}
+                                  >
+                                    <input
+                                      type="radio"
+                                      id={`q${qIndex}-o${oIndex}`}
+                                      name={`question-${qIndex}`}
+                                      value={optionText}
+                                      checked={isCorrect}
+                                      onChange={() =>
+                                        handleCorrectAnswerChange(
+                                          qIndex,
+                                          optionText
+                                        )
+                                      }
+                                      className="sr-only"
+                                    />
+                                    <div
+                                      className={cn(
+                                        'mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all',
+                                        isCorrect
+                                          ? 'border-primary bg-primary'
+                                          : 'border-muted-foreground'
+                                      )}
+                                    >
+                                      {isCorrect && (
+                                        <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>
+                                      )}
+                                    </div>
+                                    <Textarea
+                                      value={optionText}
+                                      onChange={(e) =>
+                                        handleOptionChange(
+                                          qIndex,
+                                          oIndex,
+                                          e.target.value
+                                        )
+                                      }
+                                      className="flex-grow min-w-[150px] bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary p-0 text-sm resize-none"
+                                      rows={2}
+                                    />
+                                  </Label>
+                                ) : (
+                                  <div className="w-full h-full p-2">
+                                    &nbsp;
+                                  </div>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className="font-semibold text-primary align-top min-w-[150px]">
+                            {q.correctAnswer}
+                          </TableCell>
+                          <TableCell className="align-top">
+                            <Textarea
+                              value={q.explanation}
+                              onChange={(e) =>
+                                handleQuestionFieldChange(
+                                  qIndex,
+                                  'explanation',
+                                  e.target.value
+                                )
+                              }
+                              rows={2}
+                              className="w-full min-w-[250px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 text-sm text-muted-foreground resize-none"
+                            />
+                          </TableCell>
                         </TableRow>
-                        ))}
-                        {isPending && (
-                            <TableRow>
-                                <TableCell colSpan={8} className="p-8 text-center">
-                                <div className="flex justify-center items-center gap-3">
-                                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                    <span className="text-muted-foreground">{t.analyzingButton}</span>
-                                </div>
-                                </TableCell>
-                            </TableRow>
-                        )}
+                      ))}
+                      {isPending && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="p-8 text-center">
+                            <div className="flex justify-center items-center gap-3">
+                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                              <span className="text-muted-foreground">
+                                {t.analyzingButton}
+                              </span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
-                    </Table>
+                  </Table>
                 </div>
-                ) : (
+              ) : (
                 <div className="text-center text-muted-foreground p-12 space-y-3">
-                    <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50"/>
-                    <h3 className="text-xl font-semibold text-foreground">{t.noQuestionsYet}</h3>
-                    <p>{t.noQuestionsDescription}</p>
+                  <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                  <h3 className="text-xl font-semibold text-foreground">
+                    {t.noQuestionsYet}
+                  </h3>
+                  <p>{t.noQuestionsDescription}</p>
                 </div>
-                )}
+              )}
             </CardContent>
-            </Card>
+          </Card>
         </div>
-        
+
         <div className="lg:col-span-1">
-            <Card className="shadow-sm border">
+          <Card className="shadow-sm border">
             <CardHeader>
-                <CardTitle className="font-headline text-2xl">{t.addNewTextCardTitle}</CardTitle>
+              <CardTitle className="font-headline text-2xl">
+                {t.addNewTextCardTitle}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-                <Textarea
+              <Textarea
                 placeholder={t.textAreaPlaceholder}
                 value={text}
                 onChange={handleTextChange}
                 className="min-h-[150px] text-base focus-visible:ring-primary"
                 dir={detectLanguage(text) === 'ar' ? 'rtl' : 'ltr'}
-                />
+              />
 
-                <div className="relative my-4 flex items-center justify-center">
-                    <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
-                    </div>
-                    <span className="relative bg-card px-2 text-sm text-muted-foreground">
-                        {t.orSeparator}
-                    </span>
+              <div className="relative my-4 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
                 </div>
+                <span className="relative bg-card px-2 text-sm text-muted-foreground">
+                  {t.orSeparator}
+                </span>
+              </div>
 
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    className="hidden"
-                    accept="application/pdf,image/png,image/jpeg"
-                />
-                <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    variant="outline"
-                    className="w-full"
-                    disabled={isPending}
-                >
-                    <Upload className="mr-2 h-4 w-4" />
-                    {fileName || t.uploadFileButton}
-                </Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                accept="application/pdf,image/png,image/jpeg"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                className="w-full"
+                disabled={isPending}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {fileName || t.uploadFileButton}
+              </Button>
 
-                <Button onClick={handleAnalyze} disabled={isPending || (!text.trim() && !fileDataUri)} className="mt-6 w-full" size="lg">
+              <Button
+                onClick={handleAnalyze}
+                disabled={isPending || (!text.trim() && !fileDataUri)}
+                className="mt-6 w-full"
+                size="lg"
+              >
                 {isPending ? (
-                    <>
+                  <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t.analyzingButton}
-                    </>
+                  </>
                 ) : (
-                    t.analyzeButton
+                  t.analyzeButton
                 )}
-                </Button>
+              </Button>
             </CardContent>
-            </Card>
+          </Card>
         </div>
       </div>
     </div>
