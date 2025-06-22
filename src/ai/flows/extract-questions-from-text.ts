@@ -23,7 +23,7 @@ const ExtractQuestionsOutputSchema = z.object({
       question: z.string().describe('The extracted question.'),
       options: z.array(z.string()).describe('The possible answers to the question.'),
       correctAnswer: z.string().describe('The correct answer to the question.'),
-      explanation: z.string().describe('The explanation for why the answer is correct.'),
+      explanation: z.string().describe('A detailed and academic explanation for why the answer is correct.'),
     })
   ).describe('The extracted questions and answers.'),
 });
@@ -37,9 +37,15 @@ const prompt = ai.definePrompt({
   name: 'extractQuestionsPrompt',
   input: {schema: ExtractQuestionsInputSchema},
   output: {schema: ExtractQuestionsOutputSchema},
-  prompt: `You are an expert in creating quizzes from text or documents.
+  prompt: `You are an expert in creating quizzes from text or documents. Your goal is to generate high-quality educational material.
 
-  Given the following content, extract potential questions and answers, along with the correct answer and a brief explanation for each question. The questions should be relevant to the content of the document, and the answers should be accurate and clear.
+  Given the following content, extract potential questions and answers. For each question, you must provide:
+  1.  The question itself.
+  2.  A list of multiple-choice options.
+  3.  The single correct answer from the options.
+  4.  A detailed, academic, and accurate explanation for why the answer is correct. This explanation should be comprehensive, reference the source material where applicable, and clarify any underlying concepts to enhance learning. Avoid brief or superficial explanations.
+
+  The questions should be relevant to the content of the document, and the answers should be accurate and clear.
 
   Language: {{language}}
   
@@ -54,7 +60,7 @@ const prompt = ai.definePrompt({
   {{/if}}
 
   Format the output as a JSON object with a "questions" array. Each object in the array should have the keys "question", "options", "correctAnswer", and "explanation". The options array should contain strings.
-  The value for the correctAnswer key should be one of the strings in the options array.
+  The value for the correctAnswer key must be one of the strings in the options array.
   Example:
   {
     "questions": [
@@ -62,13 +68,13 @@ const prompt = ai.definePrompt({
         "question": "What is the capital of France?",
         "options": ["Berlin", "Paris", "Rome", "Madrid"],
         "correctAnswer": "Paris",
-        "explanation": "Paris is the capital and most populous city of France."
+        "explanation": "Paris is officially designated as the capital of France in the French constitution. It is the country's most populous city and serves as the political, economic, and cultural center. The provided text mentions that 'The capital of France is Paris', confirming this fact."
       },
       {
         "question": "What is the highest mountain in the world?",
         "options": ["Mount Everest", "K2", "Kangchenjunga", "Lhotse"],
         "correctAnswer": "Mount Everest",
-        "explanation": "Mount Everest is Earth's highest mountain above sea level, located in the Mahalangur Himal sub-range of the Himalayas."
+        "explanation": "Mount Everest, located in the Mahalangur Himal sub-range of the Himalayas, is Earth's highest mountain above sea level, with a peak at 8,848.86 metres (29,031.7 ft). This is a widely established geographical fact supported by numerous surveys and mentioned in the source document."
       }
     ]
   }
