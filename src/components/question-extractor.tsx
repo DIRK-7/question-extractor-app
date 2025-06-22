@@ -35,9 +35,9 @@ const translations = {
   ar: {
     title: 'مُستخرِج الأسئلة',
     description: 'أتمتة عملية إنشاء بنوك الأسئلة متعددة الخيارات من النصوص.',
-    textAreaPlaceholder: 'الصق النص هنا...',
-    analyzeButton: 'تحليل النص واستخراج الأسئلة',
-    analyzingButton: 'جاري التحليل...',
+    textAreaPlaceholder: 'الصق النص هنا لإضافة أسئلة جديدة...',
+    analyzeButton: 'إضافة أسئلة من النص',
+    analyzingButton: 'جاري الإضافة...',
     downloadButton: 'تنزيل كملف Excel',
     tableHeaderQuestion: 'السؤال',
     tableHeaderCorrectAnswer: 'الإجابة الصحيحة',
@@ -46,14 +46,17 @@ const translations = {
     errorToastDescription: 'حدث خطأ أثناء استخراج الأسئلة.',
     errorEmptyText: 'الرجاء إدخال نص للتحليل.',
     successToastTitle: 'نجاح',
-    successToastDescription: 'تم استخراج الأسئلة بنجاح.',
+    successToastDescription: 'تمت إضافة الأسئلة بنجاح إلى الجدول.',
+    extractedQuestionsTitle: 'الأسئلة المستخرجة',
+    noQuestionsYet: 'لا توجد أسئلة حتى الآن. الصق نصًا في الأسفل وأضف أسئلة جديدة.',
+    addNewTextCardTitle: 'إضافة أسئلة جديدة من نص',
   },
   en: {
     title: 'Question Extractor',
     description: 'Automate creating multiple-choice question banks from text.',
-    textAreaPlaceholder: 'Paste your text here...',
-    analyzeButton: 'Analyze Text and Extract Questions',
-    analyzingButton: 'Analyzing...',
+    textAreaPlaceholder: 'Paste your text here to add new questions...',
+    analyzeButton: 'Add Questions from Text',
+    analyzingButton: 'Adding...',
     downloadButton: 'Download as Excel File',
     tableHeaderQuestion: 'Question',
     tableHeaderCorrectAnswer: 'Correct Answer',
@@ -62,7 +65,10 @@ const translations = {
     errorToastDescription: 'An error occurred while extracting questions.',
     errorEmptyText: 'Please enter text to analyze.',
     successToastTitle: 'Success',
-    successToastDescription: 'Questions extracted successfully.',
+    successToastDescription: 'New questions added to the table successfully.',
+    extractedQuestionsTitle: 'Extracted Questions',
+    noQuestionsYet: 'No questions yet. Paste text below to add new questions.',
+    addNewTextCardTitle: 'Add New Questions from Text',
   },
 };
 
@@ -101,7 +107,8 @@ export default function QuestionExtractor() {
     startTransition(async () => {
       try {
         const result = await extractQuestionsAction({ text, language: detectedLang });
-        setQuestions(result.questions);
+        setQuestions(prevQuestions => [...prevQuestions, ...result.questions]);
+        setText('');
         toast({
           title: t.successToastTitle,
           description: t.successToastDescription,
@@ -112,7 +119,6 @@ export default function QuestionExtractor() {
           description: error instanceof Error ? error.message : t.errorToastDescription,
           variant: 'destructive',
         });
-        setQuestions([]);
       }
     });
   };
@@ -166,39 +172,23 @@ export default function QuestionExtractor() {
       </header>
 
       <Card className="mb-8 shadow-lg">
-        <CardContent className="p-6">
-          <Textarea
-            placeholder={t.textAreaPlaceholder}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="min-h-[200px] text-base"
-            dir={detectLanguage(text) === 'ar' ? 'rtl' : 'ltr'}
-          />
-          <Button onClick={handleAnalyze} disabled={isPending} className="mt-4 w-full md:w-auto">
-            {isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {t.analyzingButton}
-              </>
-            ) : (
-              t.analyzeButton
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {questions.length > 0 && (
-        <Card className="shadow-lg">
-          <CardHeader>
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <CardTitle className="font-headline">{t.title}</CardTitle>
-              <Button onClick={handleDownload} variant="outline">
+        <CardHeader>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <CardTitle className="font-headline">{t.extractedQuestionsTitle}</CardTitle>
+            {questions.length > 0 && (
+              <Button onClick={handleDownload} variant="outline" disabled={isPending}>
                 <Download className="mr-2 h-4 w-4" />
                 {t.downloadButton}
               </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isPending && questions.length === 0 ? (
+             <div className="flex justify-center items-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
+          ) : questions.length > 0 ? (
             <TooltipProvider>
               <div className="overflow-x-auto">
                   <Table>
@@ -268,9 +258,38 @@ export default function QuestionExtractor() {
                   </Table>
               </div>
             </TooltipProvider>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="text-center text-muted-foreground p-8">
+              <p>{t.noQuestionsYet}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="font-headline">{t.addNewTextCardTitle}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          <Textarea
+            placeholder={t.textAreaPlaceholder}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="min-h-[150px] text-base"
+            dir={detectLanguage(text) === 'ar' ? 'rtl' : 'ltr'}
+          />
+          <Button onClick={handleAnalyze} disabled={isPending || !text.trim()} className="mt-4 w-full md:w-auto">
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {t.analyzingButton}
+              </>
+            ) : (
+              t.analyzeButton
+            )}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
