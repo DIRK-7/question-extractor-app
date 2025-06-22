@@ -35,6 +35,7 @@ const translations = {
     analyzingButton: 'جاري الاستخراج...',
     downloadButton: 'تنزيل كملف CSV',
     tableHeaderQuestion: 'السؤال',
+    tableHeaderOptions: 'الخيارات',
     tableHeaderCorrectAnswer: 'الإجابة الصحيحة',
     tableHeaderExplanation: 'التفسير',
     errorToastTitle: 'حدث خطأ',
@@ -57,6 +58,7 @@ const translations = {
     analyzingButton: 'Extracting...',
     downloadButton: 'Download as CSV',
     tableHeaderQuestion: 'Question',
+    tableHeaderOptions: 'Options',
     tableHeaderCorrectAnswer: 'Correct Answer',
     tableHeaderExplanation: 'Explanation',
     errorToastTitle: 'Error',
@@ -184,6 +186,40 @@ export default function QuestionExtractor() {
     );
   };
   
+  const handleQuestionFieldChange = (
+    questionIndex: number,
+    field: 'question' | 'explanation',
+    value: string
+  ) => {
+    setQuestions((prevQuestions) =>
+      prevQuestions.map((q, i) =>
+        i === questionIndex ? { ...q, [field]: value } : q
+      )
+    );
+  };
+
+  const handleOptionChange = (
+    questionIndex: number,
+    optionIndex: number,
+    newText: string
+  ) => {
+    setQuestions((prevQuestions) =>
+      prevQuestions.map((q, i) => {
+        if (i === questionIndex) {
+          const oldText = q.options[optionIndex];
+          const newOptions = [...q.options];
+          newOptions[optionIndex] = newText;
+
+          const newCorrectAnswer =
+            q.correctAnswer === oldText ? newText : q.correctAnswer;
+
+          return { ...q, options: newOptions, correctAnswer: newCorrectAnswer };
+        }
+        return q;
+      })
+    );
+  };
+
   const handleDownload = () => {
     const headers = [
       `"${t.tableHeaderQuestion}"`,
@@ -199,7 +235,7 @@ export default function QuestionExtractor() {
       }
       const rowData = [
         `"${q.question.replace(/"/g, '""')}"`,
-        ...options.slice(0, 5).map(opt => `"${opt.replace(/"/g, '""')}"`),
+        ...options.slice(0, 5).map(opt => `"${(opt || '').replace(/"/g, '""')}"`),
         `"${q.correctAnswer.replace(/"/g, '""')}"`,
         `"${(q.explanation || '').replace(/"/g, '""')}"`
       ];
@@ -244,51 +280,71 @@ export default function QuestionExtractor() {
                     <Table className="min-w-full">
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[30%]">{t.tableHeaderQuestion}</TableHead>
-                            <TableHead className="w-[40%] text-center" colSpan={5}>Options</TableHead>
+                            <TableHead className="w-[25%]">{t.tableHeaderQuestion}</TableHead>
+                            <TableHead className="w-[50%] text-center" colSpan={5}>{t.tableHeaderOptions}</TableHead>
                             <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
-                            <TableHead className="w-[30%]">{t.tableHeaderExplanation}</TableHead>
+                            <TableHead className="w-[25%]">{t.tableHeaderExplanation}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {questions.map((q, qIndex) => (
                         <TableRow key={qIndex}>
-                            <TableCell className="font-medium align-top">{q.question}</TableCell>
+                            <TableCell className="font-medium align-top">
+                                <Textarea
+                                    value={q.question}
+                                    onChange={(e) => handleQuestionFieldChange(qIndex, 'question', e.target.value)}
+                                    className="w-full bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 min-h-[60px] resize-y"
+                                />
+                            </TableCell>
                             {Array.from({ length: 5 }).map((_, oIndex) => {
-                                const optionText = q.options[oIndex] || '';
+                                const optionText = q.options[oIndex];
                                 const isCorrect = q.correctAnswer === optionText;
                                 
                                 return (
                                     <TableCell key={oIndex} className="p-1 align-top">
-                                    {optionText && (
+                                    {optionText !== undefined ? (
                                         <Label
                                             htmlFor={`q${qIndex}-o${oIndex}`}
                                             className={cn(
-                                            "flex items-center w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors",
-                                            isCorrect ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'
+                                            "flex items-start w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                                            isCorrect ? 'bg-accent/80' : 'hover:bg-muted'
                                             )}
                                         >
                                             <input
-                                            type="radio"
-                                            id={`q${qIndex}-o${oIndex}`}
-                                            name={`question-${qIndex}`}
-                                            value={optionText}
-                                            checked={isCorrect}
-                                            onChange={() => handleCorrectAnswerChange(qIndex, optionText)}
-                                            className="sr-only"
+                                                type="radio"
+                                                id={`q${qIndex}-o${oIndex}`}
+                                                name={`question-${qIndex}`}
+                                                value={optionText}
+                                                checked={isCorrect}
+                                                onChange={() => handleCorrectAnswerChange(qIndex, optionText)}
+                                                className="sr-only"
                                             />
-                                            <div className={cn("w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all", isCorrect ? "border-primary bg-primary" : "border-muted-foreground")}>
-                                            {isCorrect && <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>}
+                                            <div className={cn("mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all", isCorrect ? "border-primary bg-primary" : "border-muted-foreground")}>
+                                                {isCorrect && <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>}
                                             </div>
-                                            <span>{optionText}</span>
+                                            <Textarea
+                                                value={optionText}
+                                                onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)}
+                                                className="flex-grow bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary p-0 text-sm resize-none"
+                                                rows={1}
+                                                onInput={(e) => {
+                                                    const target = e.target as HTMLTextAreaElement;
+                                                    target.style.height = 'auto';
+                                                    target.style.height = `${target.scrollHeight}px`;
+                                                }}
+                                            />
                                         </Label>
-                                    )}
+                                    ) : <div className="w-full h-full p-2">&nbsp;</div>}
                                     </TableCell>
                                 );
                             })}
                             <TableCell className="font-semibold text-primary align-top">{q.correctAnswer}</TableCell>
                             <TableCell className="align-top">
-                                <p className="text-sm text-muted-foreground">{q.explanation}</p>
+                                <Textarea
+                                    value={q.explanation}
+                                    onChange={(e) => handleQuestionFieldChange(qIndex, 'explanation', e.target.value)}
+                                    className="w-full bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 text-sm text-muted-foreground min-h-[60px] resize-y"
+                                />
                             </TableCell>
                         </TableRow>
                         ))}
