@@ -87,10 +87,24 @@ export default function QuestionExtractor() {
 
   const t = translations[language];
 
+  const resizeTextarea = (element: HTMLTextAreaElement) => {
+    if (element) {
+      element.style.height = 'auto';
+      element.style.height = `${element.scrollHeight}px`;
+    }
+  };
+
   useEffect(() => {
     document.documentElement.lang = language;
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
   }, [language]);
+
+  useEffect(() => {
+    // This will run after the component has rendered with new questions
+    // to ensure all textareas are resized correctly.
+    const textareas = document.querySelectorAll<HTMLTextAreaElement>('textarea[data-autoresize="true"]');
+    textareas.forEach(resizeTextarea);
+  }, [questions]);
 
   const detectLanguage = (inputText: string) => {
     const arabicRegex = /[\u0600-\u06FF]/;
@@ -291,9 +305,12 @@ export default function QuestionExtractor() {
                         <TableRow key={qIndex}>
                             <TableCell className="font-medium align-top">
                                 <Textarea
+                                    data-autoresize="true"
                                     value={q.question}
                                     onChange={(e) => handleQuestionFieldChange(qIndex, 'question', e.target.value)}
-                                    className="w-full bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 min-h-[60px] resize-y"
+                                    onInput={(e) => resizeTextarea(e.target as HTMLTextAreaElement)}
+                                    rows={1}
+                                    className="w-full bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 resize-none"
                                 />
                             </TableCell>
                             {Array.from({ length: 5 }).map((_, oIndex) => {
@@ -323,15 +340,12 @@ export default function QuestionExtractor() {
                                                 {isCorrect && <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>}
                                             </div>
                                             <Textarea
+                                                data-autoresize="true"
                                                 value={optionText}
                                                 onChange={(e) => handleOptionChange(qIndex, oIndex, e.target.value)}
+                                                onInput={(e) => resizeTextarea(e.target as HTMLTextAreaElement)}
                                                 className="flex-grow bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary p-0 text-sm resize-none"
                                                 rows={1}
-                                                onInput={(e) => {
-                                                    const target = e.target as HTMLTextAreaElement;
-                                                    target.style.height = 'auto';
-                                                    target.style.height = `${target.scrollHeight}px`;
-                                                }}
                                             />
                                         </Label>
                                     ) : <div className="w-full h-full p-2">&nbsp;</div>}
@@ -341,9 +355,12 @@ export default function QuestionExtractor() {
                             <TableCell className="font-semibold text-primary align-top">{q.correctAnswer}</TableCell>
                             <TableCell className="align-top">
                                 <Textarea
+                                    data-autoresize="true"
                                     value={q.explanation}
                                     onChange={(e) => handleQuestionFieldChange(qIndex, 'explanation', e.target.value)}
-                                    className="w-full bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 text-sm text-muted-foreground min-h-[60px] resize-y"
+                                    onInput={(e) => resizeTextarea(e.target as HTMLTextAreaElement)}
+                                    rows={1}
+                                    className="w-full bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 text-sm text-muted-foreground resize-none"
                                 />
                             </TableCell>
                         </TableRow>
