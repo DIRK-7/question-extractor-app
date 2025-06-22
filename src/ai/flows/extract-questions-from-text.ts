@@ -21,11 +21,11 @@ const ExtractQuestionsOutputSchema = z.object({
   questions: z.array(
     z.object({
       question: z.string().describe('The extracted question.'),
-      options: z.array(z.string()).describe('The possible answers to the question. Each string must be a distinct and separate choice.'),
-      correctAnswer: z.string().describe('The correct answer to the question. This MUST exactly match one of the strings in the options array.'),
-      explanation: z.string().describe('A detailed and academic explanation for why the answer is correct.'),
+      options: z.array(z.string()).describe('A list of 4 to 5 possible answers to the question. Each string in the array must be a distinct and separate choice. Do NOT merge multiple potential answers into a single option string (e.g., "A. Paris\nB. London" is invalid).'),
+      correctAnswer: z.string().describe('The single correct answer to the question. This MUST be an exact, case-sensitive match to one of the strings in the options array.'),
+      explanation: z.string().describe('A detailed and academic explanation for why the answer is correct, referencing the source material.'),
     })
-  ).describe('The extracted questions and answers.'),
+  ).describe('An array of all extracted questions and answers.'),
 });
 export type ExtractQuestionsOutput = z.infer<typeof ExtractQuestionsOutputSchema>;
 
@@ -38,17 +38,21 @@ const prompt = ai.definePrompt({
   model: 'googleai/gemini-1.5-flash-latest',
   input: {schema: ExtractQuestionsInputSchema},
   output: {schema: ExtractQuestionsOutputSchema},
-  prompt: `You are an expert in creating quizzes from text or documents. Your goal is to generate high-quality educational material.
+  prompt: `You are an expert in creating high-quality, educational quizzes from text or documents. Your task is to generate questions based on the provided content.
 
-  You must scan the entire document or text provided and extract ALL possible questions from it. Do not stop until you have processed the entire content.
+  **CRITICAL INSTRUCTIONS:**
+  1.  **Scan Thoroughly:** Scan the ENTIRE document or text provided and extract ALL possible questions.
+  2.  **Strict Formatting:** For each question, you MUST adhere to the following structure:
+      *   **question**: The question itself.
+      *   **options**: An array of 4 to 5 distinct, separate, and concise multiple-choice options.
+          *   **INVALID-Option:** "Paris and Berlin"
+          *   **VALID-Option:** "Paris"
+          *   **INVALID-Option:** "1. Mount Everest"
+          *   **VALID-Option:** "Mount Everest"
+      *   **correctAnswer**: The single correct answer. This string MUST be an EXACT, case-sensitive match to ONE of the strings in the 'options' array.
+      *   **explanation**: A detailed, academic explanation for why the answer is correct.
 
-  Given the following content, extract potential questions and answers. For each question, you must provide:
-  1.  The question itself.
-  2.  A list of multiple-choice options. CRITICAL: Each multiple-choice option must be a distinct, separate, and concise answer. Do NOT merge multiple potential answers into a single option string. Do not include numbering or bullet points within the option strings themselves.
-  3.  The single correct answer from the options. The value for the correctAnswer key must be one of the strings in the options array.
-  4.  A detailed, academic, and accurate explanation for why the answer is correct. This explanation should be comprehensive, reference the source material where applicable, and clarify any underlying concepts to enhance learning. Avoid brief or superficial explanations.
-
-  Language: {{language}}
+  Language for questions: {{language}}
   
   {{#if text}}
   Content from text:
@@ -60,22 +64,16 @@ const prompt = ai.definePrompt({
   {{media url=fileDataUri}}
   {{/if}}
 
-  Format the output as a JSON object with a "questions" array. Each object in the array should have the keys "question", "options", "correctAnswer", and "explanation".
+  Format the final output as a single JSON object containing a "questions" array.
   
-  Example of a valid response:
+  **VALID RESPONSE EXAMPLE:**
   {
     "questions": [
       {
         "question": "What is the capital of France?",
         "options": ["Berlin", "Paris", "Rome", "Madrid"],
         "correctAnswer": "Paris",
-        "explanation": "Paris is officially designated as the capital of France in the French constitution. It is the country's most populous city and serves as the political, economic, and cultural center. The provided text mentions that 'The capital of France is Paris', confirming this fact."
-      },
-      {
-        "question": "What is the highest mountain in the world?",
-        "options": ["Mount Everest", "K2", "Kangchenjunga", "Lhotse"],
-        "correctAnswer": "Mount Everest",
-        "explanation": "Mount Everest, located in the Mahalangur Himal sub-range of the Himalayas, is Earth's highest mountain above sea level, with a peak at 8,848.86 metres (29,031.7 ft). This is a widely established geographical fact supported by numerous surveys and mentioned in the source document."
+        "explanation": "Paris is officially designated as the capital of France. The provided text mentions that 'The capital of France is Paris', confirming this fact."
       }
     ]
   }
