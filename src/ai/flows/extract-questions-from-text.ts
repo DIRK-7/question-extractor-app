@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview An AI agent that extracts questions and answers from a block of text.
+ * @fileOverview An AI agent that extracts questions and answers from a block of text or a file.
  *
  * - extractQuestions - A function that handles the question extraction process.
  * - ExtractQuestionsInput - The input type for the extractQuestions function.
@@ -11,7 +11,8 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const ExtractQuestionsInputSchema = z.object({
-  text: z.string().describe('The block of text to extract questions from.'),
+  text: z.string().optional().describe('The block of text to extract questions from.'),
+  fileDataUri: z.string().optional().describe("A file (image or PDF) as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."),
   language: z.enum(['ar', 'en']).describe('The language of the text (ar for Arabic, en for English).'),
 });
 export type ExtractQuestionsInput = z.infer<typeof ExtractQuestionsInputSchema>;
@@ -36,12 +37,21 @@ const prompt = ai.definePrompt({
   name: 'extractQuestionsPrompt',
   input: {schema: ExtractQuestionsInputSchema},
   output: {schema: ExtractQuestionsOutputSchema},
-  prompt: `You are an expert in creating quizzes from text.
+  prompt: `You are an expert in creating quizzes from text or documents.
 
-  Given the following text, extract potential questions and answers, along with the correct answer and a brief explanation for each question. The questions should be relevant to the content of the text, and the answers should be accurate and clear.
+  Given the following content, extract potential questions and answers, along with the correct answer and a brief explanation for each question. The questions should be relevant to the content of the document, and the answers should be accurate and clear.
 
   Language: {{language}}
-  Text: {{{text}}}
+  
+  {{#if text}}
+  Content from text:
+  {{{text}}}
+  {{/if}}
+
+  {{#if fileDataUri}}
+  Content from file:
+  {{media url=fileDataUri}}
+  {{/if}}
 
   Format the output as a JSON object with a "questions" array. Each object in the array should have the keys "question", "options", "correctAnswer", and "explanation". The options array should contain strings.
   The value for the correctAnswer key should be one of the strings in the options array.
