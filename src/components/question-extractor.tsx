@@ -26,6 +26,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
@@ -39,13 +40,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
   Loader2,
@@ -57,14 +51,30 @@ import {
   X,
   Save,
   MoreVertical,
+  FileText,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  FilePlus,
+  ChevronRight
 } from 'lucide-react';
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarInset,
+  SidebarTrigger,
+  SidebarFooter,
+} from '@/components/ui/sidebar';
+
 import { extractQuestionsAction } from '@/app/actions';
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
 import type { ExtractQuestionsInput } from '@/ai/flows/extract-questions-from-text';
 import { ThemeToggle } from './theme-toggle';
-import { isEqual } from 'lodash';
 
+// Types
 type Question = {
   question: string;
   options: string[];
@@ -72,10 +82,73 @@ type Question = {
   explanation: string;
 };
 
-type Project = {
+type FileNode = {
+  id: string;
+  name:string;
+  type: 'file';
+  questions: Question[];
+};
+
+type FolderNode = {
   id: string;
   name: string;
-  questions: Question[];
+  type: 'folder';
+  children: TreeNode[];
+}
+
+type TreeNode = FileNode | FolderNode;
+
+// Tree manipulation helpers
+const findNode = (nodes: TreeNode[], nodeId: string | null): TreeNode | null => {
+  if (!nodeId) return null;
+  for (const node of nodes) {
+    if (node.id === nodeId) return node;
+    if (node.type === 'folder') {
+      const found = findNode(node.children, nodeId);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+const updateNodeInTree = (nodes: TreeNode[], nodeId: string, updates: Partial<TreeNode>): TreeNode[] => {
+  return nodes.map(node => {
+    if (node.id === nodeId) {
+      return { ...node, ...updates };
+    }
+    if (node.type === 'folder' && node.children) {
+      const newChildren = updateNodeInTree(node.children, nodeId, updates);
+      if (newChildren !== node.children) {
+        return { ...node, children: newChildren };
+      }
+    }
+    return node;
+  }).filter(Boolean) as TreeNode[];
+};
+
+const deleteNodeFromTree = (nodes: TreeNode[], nodeId: string): TreeNode[] => {
+  return nodes.filter(node => {
+    if (node.id === nodeId) return false;
+    if (node.type === 'folder' && node.children) {
+      node.children = deleteNodeFromTree(node.children, nodeId);
+    }
+    return true;
+  });
+};
+
+const addNodeToTree = (nodes: TreeNode[], parentId: string | null, newNode: TreeNode): TreeNode[] => {
+  if (parentId === null) {
+    return [...nodes, newNode];
+  }
+  return nodes.map(node => {
+    if (node.id === parentId && node.type === 'folder') {
+      return { ...node, children: [...node.children, newNode] };
+    }
+    if (node.type === 'folder' && node.children) {
+      return { ...node, children: addNodeToTree(node.children, parentId, newNode) };
+    }
+    return node;
+  });
 };
 
 const translations = {
@@ -98,7 +171,7 @@ const translations = {
     successToastDescription: 'تمت إضافة الأسئلة الجديدة بنجاح.',
     extractedQuestionsTitle: 'بنك الأسئلة',
     noQuestionsYet: 'لم يتم استخراج أي أسئلة بعد.',
-    noQuestionsDescription: 'ابدأ بلصق نص أو رفع ملف.',
+    noQuestionsDescription: 'ابدأ باختيار ملف، أو لصق نص أو رفع مستند.',
     addNewTextCardTitle: 'إضافة أسئلة جديدة',
     uploadFileButton: 'رفع ملف (صورة أو PDF)',
     orSeparator: 'أو',
@@ -114,29 +187,28 @@ const translations = {
     clearAllButton: 'مسح الكل',
     clearAllDialogTitle: 'هل أنت متأكد؟',
     clearAllDialogDescription:
-      'سيؤدي هذا الإجراء إلى حذف جميع الأسئلة بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
+      'سيؤدي هذا الإجراء إلى حذف جميع الأسئلة في الملف الحالي بشكل دائم.',
     clearAllDialogCancel: 'إلغاء',
     clearAllDialogConfirm: 'تأكيد الحذف',
-    projects: 'المشاريع',
-    selectProject: 'اختر مشروعًا',
-    noProjects: 'لا توجد مشاريع بعد',
-    newProject: 'مشروع جديد',
-    saveProject: 'حفظ المشروع',
-    renameProject: 'إعادة تسمية المشروع',
-    deleteProject: 'حذف المشروع',
-    projectNameLabel: 'اسم المشروع',
-    createProjectTitle: 'إنشاء مشروع جديد',
-    createProjectButton: 'إنشاء',
-    renameProjectTitle: 'إعادة تسمية المشروع',
+    fileExplorer: "مستكشف الملفات",
+    newFolder: "مجلد جديد",
+    newFile: "ملف جديد",
+    rename: "إعادة تسمية",
+    delete: "حذف",
+    enterFolderName: "أدخل اسم المجلد",
+    enterFileName: "أدخل اسم الملف",
+    deleteItemConfirmTitle: "هل أنت متأكد من الحذف؟",
+    deleteItemConfirmDescription: "سيتم حذف هذا العنصر وجميع محتوياته بشكل دائم. لا يمكن التراجع عن هذا الإجراء.",
+    saveFile: "حفظ الملف",
+    unsavedChangesTitle: "لديك تغييرات غير محفوظة",
+    unsavedChangesDescription: "هل تريد المتابعة وتجاهل التغييرات؟",
+    discardChanges: "تجاهل",
+    unsavedChangesTooltip: "توجد تغييرات غير محفوظة",
+    noFileSelected: 'الرجاء اختيار ملف لعرض الأسئلة.',
+    fileSavedSuccess: 'تم حفظ الملف بنجاح.',
+    noActiveFile: "الرجاء تحديد ملف أولاً.",
     saveButton: 'حفظ',
-    deleteProjectTitle: 'هل أنت متأكد من حذف المشروع؟',
-    deleteProjectDescription: 'سيتم حذف هذا المشروع بشكل دائم.',
-    projectSavedSuccess: 'تم حفظ المشروع بنجاح.',
-    noActiveProject: 'الرجاء اختيار أو إنشاء مشروع أولاً.',
-    unsavedChangesTitle: 'لديك تغييرات غير محفوظة',
-    unsavedChangesDescription: 'هل تريد المتابعة وتجاهل التغييرات؟',
-    discardChanges: 'تجاهل',
-    unsavedChangesTooltip: 'توجد تغييرات غير محفوظة',
+    createProjectButton: 'إنشاء',
   },
   en: {
     title: 'Question Extractor',
@@ -158,7 +230,7 @@ const translations = {
     successToastDescription: 'New questions added successfully.',
     extractedQuestionsTitle: 'Question Bank',
     noQuestionsYet: 'No questions extracted yet.',
-    noQuestionsDescription: 'Get started by pasting text or uploading a file.',
+    noQuestionsDescription: 'Get started by selecting a file, or by pasting text or uploading a document.',
     addNewTextCardTitle: 'Add New Questions',
     uploadFileButton: 'Upload File (Image or PDF)',
     orSeparator: 'or',
@@ -174,30 +246,29 @@ const translations = {
     clearAllButton: 'Clear All',
     clearAllDialogTitle: 'Are you sure?',
     clearAllDialogDescription:
-      'This action will permanently delete all questions. This cannot be undone.',
+      'This action will permanently delete all questions in the current file.',
     clearAllDialogCancel: 'Cancel',
     clearAllDialogConfirm: 'Confirm Delete',
-    projects: 'Projects',
-    selectProject: 'Select a Project',
-    noProjects: 'No projects yet',
-    newProject: 'New Project',
-    saveProject: 'Save Project',
-    renameProject: 'Rename Project',
-    deleteProject: 'Delete Project',
-    projectNameLabel: 'Project Name',
-    createProjectTitle: 'Create New Project',
-    createProjectButton: 'Create',
-    renameProjectTitle: 'Rename Project',
-    saveButton: 'Save',
-    deleteProjectTitle: 'Are you sure you want to delete the project?',
-    deleteProjectDescription: 'This will permanently delete the project.',
-    projectSavedSuccess: 'Project saved successfully.',
-    noActiveProject: 'Please select or create a project first.',
-    unsavedChangesTitle: 'You have unsaved changes',
+    fileExplorer: "File Explorer",
+    newFolder: "New Folder",
+    newFile: "New File",
+    rename: "Rename",
+    delete: "Delete",
+    enterFolderName: "Enter folder name",
+    enterFileName: "Enter file name",
+    deleteItemConfirmTitle: "Are you sure you want to delete?",
+    deleteItemConfirmDescription: "This item and all its contents will be permanently deleted. This action cannot be undone.",
+    saveFile: "Save File",
+    unsavedChangesTitle: "You have unsaved changes",
     unsavedChangesDescription:
-      'Are you sure you want to continue and discard them?',
-    discardChanges: 'Discard',
-    unsavedChangesTooltip: 'There are unsaved changes',
+      "Are you sure you want to continue and discard them?",
+    discardChanges: "Discard",
+    unsavedChangesTooltip: "There are unsaved changes",
+    noFileSelected: "Please select a file to view questions.",
+    fileSavedSuccess: "File saved successfully.",
+    noActiveFile: "Please select a file first.",
+    saveButton: 'Save',
+    createProjectButton: 'Create',
   },
 };
 
@@ -214,74 +285,78 @@ export default function QuestionExtractor() {
   const [downloadFileName, setDownloadFileName] = useState('questions');
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
-  // Project state
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  // File System State
+  const [fileTree, setFileTree] = useState<TreeNode[]>([]);
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [isDirty, setIsDirty] = useState(false);
-  
+
   // Dialog states
-  const [isNewProjectDialogOpen, setIsNewProjectDialogOpen] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
-  const [renameProjectName, setRenameProjectName] = useState('');
-  const [isDeleteProjectConfirmOpen, setIsDeleteProjectConfirmOpen] = useState(false);
+  const [nodeToRename, setNodeToRename] = useState<TreeNode | null>(null);
+  const [newNodeName, setNewNodeName] = useState('');
+  const [nodeToDelete, setNodeToDelete] = useState<TreeNode | null>(null);
   const [isUnsavedChangesDialogOpen, setIsUnsavedChangesDialogOpen] = useState(false);
   const [nextAction, setNextAction] = useState<(() => void) | null>(null);
-
+  const [nodeToAddTo, setNodeToAddTo] = useState<FolderNode | null>(null);
+  const [newNodeInfo, setNewNodeInfo] = useState<{type: 'file' | 'folder', name: string} | null>(null);
 
   const t = translations[language];
-  const activeProject = projects.find((p) => p.id === activeProjectId);
+  const activeFile = findNode(fileTree, activeFileId) as FileNode | null;
 
-  // Load projects from localStorage on mount
+  // Load tree from localStorage on mount
   useEffect(() => {
     try {
-      const savedProjects = localStorage.getItem('question-extractor-projects');
-      if (savedProjects) {
-        const parsedProjects: Project[] = JSON.parse(savedProjects);
-        setProjects(parsedProjects);
-        const lastActiveId = localStorage.getItem('question-extractor-active-project-id');
-        if (lastActiveId && parsedProjects.some(p => p.id === lastActiveId)) {
-          const projectToLoad = parsedProjects.find(p => p.id === lastActiveId);
-          if (projectToLoad) {
-            setActiveProjectId(lastActiveId);
-            setQuestions(projectToLoad.questions);
-          }
-        }
+      const savedTreeJson = localStorage.getItem('question-extractor-file-tree');
+      const savedTree = savedTreeJson ? JSON.parse(savedTreeJson) : [];
+      setFileTree(savedTree);
+      
+      const savedActiveId = localStorage.getItem('question-extractor-active-file-id');
+      if (savedActiveId) {
+        const fileToLoad = findNode(savedTree, savedActiveId) as FileNode | null;
+         if (fileToLoad) {
+            setActiveFileId(savedActiveId);
+            setQuestions(fileToLoad.questions);
+         }
+      }
+      const savedExpanded = localStorage.getItem('question-extractor-expanded-folders');
+      if (savedExpanded) {
+        setExpandedFolders(new Set(JSON.parse(savedExpanded)));
       }
     } catch (e) {
-      console.error('Failed to load projects from localStorage', e);
+      console.error('Failed to load data from localStorage', e);
     }
   }, []);
 
-  // Save projects to localStorage when they change
+  // Save tree and state to localStorage when they change
   useEffect(() => {
-    localStorage.setItem('question-extractor-projects', JSON.stringify(projects));
-  }, [projects]);
+    localStorage.setItem('question-extractor-file-tree', JSON.stringify(fileTree));
+  }, [fileTree]);
 
-  // Save active project ID to localStorage
   useEffect(() => {
-    if (activeProjectId) {
-      localStorage.setItem('question-extractor-active-project-id', activeProjectId);
+    if (activeFileId) {
+      localStorage.setItem('question-extractor-active-file-id', activeFileId);
     } else {
-      localStorage.removeItem('question-extractor-active-project-id');
+      localStorage.removeItem('question-extractor-active-file-id');
     }
-  }, [activeProjectId]);
+  }, [activeFileId]);
+
+  useEffect(() => {
+    localStorage.setItem('question-extractor-expanded-folders', JSON.stringify(Array.from(expandedFolders)));
+  }, [expandedFolders]);
 
   // Check for unsaved changes
   useEffect(() => {
-    if (!activeProject) {
-      setIsDirty(questions.length > 0);
+    if (!activeFile) {
+      setIsDirty(questions.length > 0 && !activeFileId);
       return;
     }
-    const savedQuestions = activeProject.questions;
-    // Use a deep comparison to check for changes
+    const savedQuestions = activeFile.questions;
     if (JSON.stringify(savedQuestions) !== JSON.stringify(questions)) {
         setIsDirty(true);
     } else {
         setIsDirty(false);
     }
-  }, [questions, activeProject]);
-
+  }, [questions, activeFile]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -326,6 +401,14 @@ export default function QuestionExtractor() {
   };
 
   const handleAnalyze = () => {
+     if (!activeFileId) {
+        toast({
+            title: t.errorToastTitle,
+            description: t.noActiveFile,
+            variant: 'destructive',
+        });
+        return;
+    }
     if (!text.trim() && !fileDataUri) {
       toast({
         title: t.errorToastTitle,
@@ -394,68 +477,86 @@ export default function QuestionExtractor() {
     setNextAction(null);
     setIsDirty(false);
   };
-  
-  const handleSelectProject = (projectId: string) => {
-    const projectToLoad = projects.find((p) => p.id === projectId);
-    if (projectToLoad) {
-      setActiveProjectId(projectId);
-      setQuestions(projectToLoad.questions);
-      setIsDirty(false);
-    }
-  };
 
-  const handleCreateNewProject = () => {
-    if (!newProjectName.trim()) return;
-    const newProject: Project = {
-      id: Date.now().toString(),
-      name: newProjectName,
-      questions: [],
+  const handleSelectFile = (fileId: string) => {
+    const action = () => {
+        const fileToLoad = findNode(fileTree, fileId) as FileNode | null;
+        if (fileToLoad && fileToLoad.type === 'file') {
+            setActiveFileId(fileId);
+            setQuestions(fileToLoad.questions);
+            setIsDirty(false);
+        }
     };
-    setProjects(prev => [...prev, newProject]);
-    setActiveProjectId(newProject.id);
-    setQuestions([]);
-    setIsNewProjectDialogOpen(false);
-    setNewProjectName('');
-    setIsDirty(false);
+    executeWithUnsavedChangesCheck(action);
   };
 
-  const handleSaveProject = () => {
-    if (!activeProjectId) {
-      toast({ title: t.errorToastTitle, description: t.noActiveProject, variant: 'destructive' });
+  const handleToggleFolder = (folderId: string) => {
+    setExpandedFolders(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(folderId)) {
+            newSet.delete(folderId);
+        } else {
+            newSet.add(folderId);
+        }
+        return newSet;
+    });
+  };
+
+  const handleSaveFile = () => {
+    if (!activeFileId) {
+      toast({ title: t.errorToastTitle, description: t.noActiveFile, variant: 'destructive' });
       return;
     }
-    setProjects(prevProjects =>
-      prevProjects.map(p =>
-        p.id === activeProjectId ? { ...p, questions: questions } : p
-      )
-    );
-    toast({ title: t.successToastTitle, description: t.projectSavedSuccess });
+    setFileTree(prevTree => updateNodeInTree(prevTree, activeFileId, { questions }));
+    toast({ title: t.successToastTitle, description: t.fileSavedSuccess });
     setIsDirty(false);
-  };
-
-  const handleRenameProject = () => {
-    if (!activeProjectId || !renameProjectName.trim()) return;
-    setProjects(prevProjects =>
-      prevProjects.map(p =>
-        p.id === activeProjectId ? { ...p, name: renameProjectName } : p
-      )
-    );
-    setIsRenameDialogOpen(false);
-    setRenameProjectName('');
   };
   
-  const handleDeleteProject = () => {
-    if (!activeProjectId) return;
-    setProjects(prevProjects => prevProjects.filter(p => p.id !== activeProjectId));
-    if (activeProjectId === activeProjectId) {
-      setActiveProjectId(null);
-      setQuestions([]);
+  const handleAddNewNode = () => {
+    if (!newNodeInfo) return;
+    const { type, name } = newNodeInfo;
+    const parentId = nodeToAddTo?.id || null;
+    
+    if (!name.trim()) return;
+
+    const newNode: TreeNode = type === 'file'
+      ? { id: Date.now().toString(), name, type: 'file', questions: [] }
+      : { id: Date.now().toString(), name, type: 'folder', children: [] };
+
+    setFileTree(prevTree => addNodeToTree(prevTree, parentId, newNode));
+    
+    if(parentId) {
+        setExpandedFolders(prev => new Set(prev).add(parentId));
     }
-    setIsDeleteProjectConfirmOpen(false);
-    setIsDirty(false);
+    
+    setNodeToAddTo(null);
+    setNewNodeInfo(null);
   };
 
+  const handleRenameNode = () => {
+    if (!nodeToRename || !newNodeName.trim()) return;
+    setFileTree(prevTree => updateNodeInTree(prevTree, nodeToRename.id, { name: newNodeName }));
+    setNodeToRename(null);
+    setNewNodeName('');
+  };
+
+  const handleDeleteNode = () => {
+    if (!nodeToDelete) return;
+    setFileTree(prevTree => deleteNodeFromTree(prevTree, nodeToDelete.id));
+    if (activeFileId === nodeToDelete.id) {
+        setActiveFileId(null);
+        setQuestions([]);
+        setIsDirty(false);
+    }
+    setNodeToDelete(null);
+  };
+
+
   const handleAddQuestion = () => {
+    if (!activeFileId) {
+      toast({ title: t.errorToastTitle, description: t.noActiveFile, variant: 'destructive' });
+      return;
+    }
     const newQuestion: Question = {
       question: '',
       options: ['', '', '', '', ''],
@@ -589,12 +690,70 @@ export default function QuestionExtractor() {
     } else {
       executeJsonDownload(downloadFileName)
     }
-    setIsDownloadDialogOpen(false); // Close the dialog
+    setIsDownloadDialogOpen(false);
   };
 
+  const renderTree = (nodes: TreeNode[], level: number): React.ReactNode => {
+    return nodes.map((node) => (
+      <div key={node.id} style={{ paddingRight: `${level * 1.25}rem` }} className="pl-0">
+        <div className={cn(
+            "flex items-center justify-between group rounded-md hover:bg-muted",
+            activeFileId === node.id && "bg-accent text-accent-foreground"
+        )}>
+          <button
+            onClick={() => node.type === 'folder' ? handleToggleFolder(node.id) : handleSelectFile(node.id)}
+            className="flex-grow flex items-center gap-2 p-2 text-sm text-right"
+          >
+            {node.type === 'folder' ? (
+              <>
+                <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-200", expandedFolders.has(node.id) && "rotate-90")}/>
+                {expandedFolders.has(node.id) ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
+              </>
+            ) : <FileText className="h-4 w-4 mr-1" />}
+            <span className="truncate">{node.name}</span>
+          </button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-50 group-hover:opacity-100">
+                    <MoreVertical className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {node.type === 'folder' && (
+                <>
+                 <DropdownMenuItem onSelect={() => {setNodeToAddTo(node); setNewNodeInfo({type: 'folder', name: ''})}}>
+                    <FolderPlus className="ml-2 h-4 w-4" />
+                    <span>{t.newFolder}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => {setNodeToAddTo(node); setNewNodeInfo({type: 'file', name: ''})}}>
+                    <FilePlus className="ml-2 h-4 w-4" />
+                    <span>{t.newFile}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onSelect={() => { setNodeToRename(node); setNewNodeName(node.name); }}>
+                {t.rename}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setNodeToDelete(node)} className="text-destructive focus:text-destructive">
+                {t.delete}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        {node.type === 'folder' && expandedFolders.has(node.id) && (
+          <div>{renderTree(node.children, level + 1)}</div>
+        )}
+      </div>
+    ));
+  };
+
+
   return (
+   <SidebarProvider>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      {/* Unsaved Changes Dialog */}
+      {/* DIALOGS */}
       <AlertDialog open={isUnsavedChangesDialogOpen} onOpenChange={setIsUnsavedChangesDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -610,6 +769,40 @@ export default function QuestionExtractor() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={!!nodeToRename} onOpenChange={(isOpen) => !isOpen && setNodeToRename(null)}>
+        <DialogContent>
+            <DialogHeader><DialogTitle>{t.rename}</DialogTitle></DialogHeader>
+            <Input value={newNodeName} onChange={e => setNewNodeName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleRenameNode()} />
+            <DialogFooter><Button onClick={handleRenameNode}>{t.saveButton}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={!!newNodeInfo} onOpenChange={(isOpen) => !isOpen && setNewNodeInfo(null)}>
+        <DialogContent>
+            <DialogHeader><DialogTitle>{newNodeInfo?.type === 'folder' ? t.newFolder : t.newFile}</DialogTitle></DialogHeader>
+            <Input 
+              value={newNodeInfo?.name || ''} 
+              onChange={e => setNewNodeInfo(prev => prev ? {...prev, name: e.target.value} : null)} 
+              placeholder={newNodeInfo?.type === 'folder' ? t.enterFolderName : t.enterFileName}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddNewNode()} 
+            />
+            <DialogFooter><Button onClick={handleAddNewNode}>{t.createProjectButton}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={!!nodeToDelete} onOpenChange={(isOpen) => !isOpen && setNodeToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>{t.deleteItemConfirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{t.deleteItemConfirmDescription}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel>{t.clearAllDialogCancel}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteNode} variant="destructive">{t.delete}</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
       <header className="text-center mb-10">
         <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">
           {t.title}
@@ -619,414 +812,355 @@ export default function QuestionExtractor() {
         </p>
       </header>
 
-      {/* Project Management Bar */}
-      <Card className="mb-8 shadow-sm border">
-        <CardContent className="p-4 flex flex-wrap items-center gap-4">
-          <Label className="font-bold text-lg">{t.projects}:</Label>
-          <div className="flex-grow min-w-[200px]">
-            <Select
-              value={activeProjectId || ''}
-              onValueChange={(value) => executeWithUnsavedChangesCheck(() => handleSelectProject(value))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t.selectProject} />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.length > 0 ? projects.map(p => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                )) : <div className="p-2 text-sm text-muted-foreground">{t.noProjects}</div>}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <Dialog open={isNewProjectDialogOpen} onOpenChange={setIsNewProjectDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" onClick={() => executeWithUnsavedChangesCheck(() => setIsNewProjectDialogOpen(true))}>
-                {t.newProject}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t.createProjectTitle}</DialogTitle>
-              </DialogHeader>
-              <Input
-                placeholder={t.projectNameLabel}
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreateNewProject()}
-              />
-              <DialogFooter>
-                <Button onClick={handleCreateNewProject}>{t.createProjectButton}</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Button onClick={handleSaveProject} disabled={!activeProjectId || !isDirty || isPending}>
-            <Save className="mr-2 h-4 w-4" />
-            {t.saveProject}
-            {isDirty && activeProjectId && <span className="ml-2 h-2 w-2 rounded-full bg-destructive animate-pulse" title={t.unsavedChangesTooltip}></span>}
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" disabled={!activeProjectId}>
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem
-                onSelect={() => {
-                  setRenameProjectName(activeProject?.name || '');
-                  setIsRenameDialogOpen(true);
-                }}
-              >
-                {t.renameProject}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => setIsDeleteProjectConfirmOpen(true)}
-                className="text-destructive focus:text-destructive"
-              >
-                {t.deleteProject}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Rename Project Dialog */}
-          <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
-            <DialogContent>
-              <DialogHeader><DialogTitle>{t.renameProjectTitle}</DialogTitle></DialogHeader>
-              <Input value={renameProjectName} onChange={e => setRenameProjectName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleRenameProject()} />
-              <DialogFooter><Button onClick={handleRenameProject}>{t.saveButton}</Button></DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Delete Project Alert */}
-          <AlertDialog open={isDeleteProjectConfirmOpen} onOpenChange={setIsDeleteProjectConfirmOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{t.deleteProjectTitle}</AlertDialogTitle>
-                <AlertDialogDescription>{t.deleteProjectDescription}</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t.clearAllDialogCancel}</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteProject} variant="destructive">{t.deleteProject}</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </CardContent>
-      </Card>
-
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          <Card className="shadow-sm border h-full">
-            <CardHeader>
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <CardTitle className="font-headline text-2xl">
-                  {activeProject ? activeProject.name : t.extractedQuestionsTitle}
-                </CardTitle>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleAddQuestion}
-                    disabled={isPending}
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    {t.addNewQuestionButton}
-                  </Button>
-                  {questions.length > 0 && (
-                    <>
-                      <Dialog
-                        open={isDownloadDialogOpen}
-                        onOpenChange={setIsDownloadDialogOpen}
-                      >
-                        <DialogTrigger asChild>
-                          <Button variant="outline" disabled={isPending}>
-                            <Download className="mr-2 h-4 w-4" />
-                            {t.downloadButton}
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
-                          <DialogHeader>
-                            <DialogTitle>{t.downloadDialogTitle}</DialogTitle>
-                            <DialogDescription>
-                              {t.downloadDialogDescription}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label
-                                htmlFor="filename"
-                                className="text-right rtl:text-left"
-                              >
-                                {t.downloadDialogFileNameLabel}
-                              </Label>
-                              <Input
-                                id="filename"
-                                value={downloadFileName}
-                                onChange={(e) =>
-                                  setDownloadFileName(e.target.value)
-                                }
-                                className="col-span-3"
-                              />
-                            </div>
-                          </div>
-                          <DialogFooter>
-                            <Button onClick={() => handleConfirmDownload('csv')}>
-                              {t.downloadCsvButton}
-                            </Button>
-                             <Button onClick={() => handleConfirmDownload('json')} variant="secondary">
-                              {t.downloadJsonButton}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-
-                      <AlertDialog
-                        open={isClearConfirmOpen}
-                        onOpenChange={setIsClearConfirmOpen}
-                      >
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" disabled={isPending}>
-                            <X className="mr-2 h-4 w-4" />
-                            {t.clearAllButton}
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>
-                              {t.clearAllDialogTitle}
-                            </AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {t.clearAllDialogDescription}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>
-                              {t.clearAllDialogCancel}
-                            </AlertDialogCancel>
-                            <AlertDialogAction onClick={handleClearAll}>
-                              {t.clearAllDialogConfirm}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </>
-                  )}
-                  <ThemeToggle />
+      <div className="flex flex-row-reverse gap-8">
+        <Sidebar side="right" variant="sidebar" className="max-w-xs w-full">
+            <SidebarHeader>
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold">{t.fileExplorer}</h2>
+                    <SidebarTrigger />
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {questions.length > 0 || isPending ? (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t.tableHeaderQuestion}</TableHead>
-                        <TableHead className="text-center" colSpan={5}>
-                          {t.tableHeaderOptions}
-                        </TableHead>
-                        <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
-                        <TableHead>{t.tableHeaderExplanation}</TableHead>
-                        <TableHead className="w-[50px] text-center">{t.tableHeaderActions}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {questions.map((q, qIndex) => (
-                        <TableRow key={qIndex}>
-                          <TableCell className="font-medium align-top">
-                            <Textarea
-                              value={q.question}
-                              onChange={(e) =>
-                                handleQuestionFieldChange(
-                                  qIndex,
-                                  'question',
-                                  e.target.value
-                                )
-                              }
-                              rows={2}
-                              className="w-full min-w-[200px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 resize-none"
-                            />
-                          </TableCell>
-                          {Array.from({ length: 5 }).map((_, oIndex) => {
-                            const optionText = q.options[oIndex] ?? '';
-                            const isCorrect = q.correctAnswer === optionText && optionText !== '';
-
-                            return (
-                              <TableCell key={oIndex} className="p-1 align-top">
+            </SidebarHeader>
+            <SidebarContent>
+              {renderTree(fileTree, 0)}
+            </SidebarContent>
+            <SidebarFooter className="flex-row">
+                <Button variant="outline" className="flex-1" onClick={() => {setNodeToAddTo(null); setNewNodeInfo({type: 'folder', name: ''})}}>
+                    <FolderPlus className="ml-2 h-4 w-4" />
+                    {t.newFolder}
+                </Button>
+                 <Button variant="outline" className="flex-1" onClick={() => {setNodeToAddTo(null); setNewNodeInfo({type: 'file', name: ''})}}>
+                    <FilePlus className="ml-2 h-4 w-4" />
+                    {t.newFile}
+                </Button>
+            </SidebarFooter>
+        </Sidebar>
+        
+        <SidebarInset className="flex-1 min-w-0">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            <div className="xl:col-span-2">
+              <Card className="shadow-sm border h-full">
+                <CardHeader>
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <CardTitle className="font-headline text-2xl truncate" title={activeFile?.name || t.extractedQuestionsTitle}>
+                      {activeFile ? activeFile.name : t.extractedQuestionsTitle}
+                    </CardTitle>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button onClick={handleSaveFile} disabled={!activeFileId || !isDirty || isPending}>
+                        <Save className="mr-2 h-4 w-4" />
+                        {t.saveFile}
+                        {isDirty && activeFileId && <span className="ml-2 h-2 w-2 rounded-full bg-destructive animate-pulse" title={t.unsavedChangesTooltip}></span>}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleAddQuestion}
+                        disabled={isPending || !activeFileId}
+                      >
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        {t.addNewQuestionButton}
+                      </Button>
+                      {questions.length > 0 && (
+                        <>
+                          <Dialog
+                            open={isDownloadDialogOpen}
+                            onOpenChange={setIsDownloadDialogOpen}
+                          >
+                            <DialogTrigger asChild>
+                              <Button variant="outline" disabled={isPending}>
+                                <Download className="mr-2 h-4 w-4" />
+                                {t.downloadButton}
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                              <DialogHeader>
+                                <DialogTitle>{t.downloadDialogTitle}</DialogTitle>
+                                <DialogDescription>
+                                  {t.downloadDialogDescription}
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
                                   <Label
-                                    htmlFor={`q${qIndex}-o${oIndex}`}
-                                    className={cn(
-                                      'flex items-start w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors',
-                                      isCorrect
-                                        ? 'bg-accent/80'
-                                        : 'hover:bg-muted'
-                                    )}
+                                    htmlFor="filename"
+                                    className="text-right rtl:text-left"
                                   >
-                                    <input
-                                      type="radio"
-                                      id={`q${qIndex}-o${oIndex}`}
-                                      name={`question-${qIndex}`}
-                                      value={optionText}
-                                      checked={isCorrect}
-                                      onChange={() =>
-                                        handleCorrectAnswerChange(
-                                          qIndex,
-                                          optionText
-                                        )
-                                      }
-                                      className="sr-only"
-                                    />
-                                    <div
-                                      className={cn(
-                                        'mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all',
-                                        isCorrect
-                                          ? 'border-primary bg-primary'
-                                          : 'border-muted-foreground'
-                                      )}
-                                    >
-                                      {isCorrect && (
-                                        <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>
-                                      )}
-                                    </div>
-                                    <Textarea
-                                      value={optionText}
-                                      onChange={(e) =>
-                                        handleOptionChange(
-                                          qIndex,
-                                          oIndex,
-                                          e.target.value
-                                        )
-                                      }
-                                      className="flex-grow min-w-[150px] bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary p-0 text-sm resize-none"
-                                      rows={2}
-                                    />
+                                    {t.downloadDialogFileNameLabel}
                                   </Label>
-                              </TableCell>
-                            );
-                          })}
-                          <TableCell className="font-semibold text-primary align-top min-w-[150px]">
-                            {q.correctAnswer}
-                          </TableCell>
-                          <TableCell className="align-top">
-                            <Textarea
-                              value={q.explanation}
-                              onChange={(e) =>
-                                handleQuestionFieldChange(
-                                  qIndex,
-                                  'explanation',
-                                  e.target.value
-                                )
-                              }
-                              rows={2}
-                              className="w-full min-w-[250px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 text-sm text-muted-foreground resize-none"
-                            />
-                          </TableCell>
-                          <TableCell className="align-top p-2 text-center">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-destructive"
-                              onClick={() => handleDeleteQuestion(qIndex)}
-                              aria-label={t.deleteQuestionTooltip}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {isPending && (
-                        <TableRow>
-                          <TableCell colSpan={9} className="p-8 text-center">
-                            <div className="flex justify-center items-center gap-3">
-                              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                              <span className="text-muted-foreground">
-                                {t.analyzingButton}
-                              </span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
+                                  <Input
+                                    id="filename"
+                                    value={downloadFileName}
+                                    onChange={(e) =>
+                                      setDownloadFileName(e.target.value)
+                                    }
+                                    className="col-span-3"
+                                  />
+                                </div>
+                              </div>
+                              <DialogFooter>
+                                <Button onClick={() => handleConfirmDownload('csv')}>
+                                  {t.downloadCsvButton}
+                                </Button>
+                                <Button onClick={() => handleConfirmDownload('json')} variant="secondary">
+                                  {t.downloadJsonButton}
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                          <AlertDialog
+                            open={isClearConfirmOpen}
+                            onOpenChange={setIsClearConfirmOpen}
+                          >
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" disabled={isPending}>
+                                <X className="mr-2 h-4 w-4" />
+                                {t.clearAllButton}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  {t.clearAllDialogTitle}
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  {t.clearAllDialogDescription}
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>
+                                  {t.clearAllDialogCancel}
+                                </AlertDialogCancel>
+                                <AlertDialogAction onClick={handleClearAll}>
+                                  {t.clearAllDialogConfirm}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
                       )}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground p-12 space-y-3">
-                  <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
-                  <h3 className="text-xl font-semibold text-foreground">
-                    {t.noQuestionsYet}
-                  </h3>
-                  <p>{t.noQuestionsDescription}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                      <ThemeToggle />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {!activeFileId ? (
+                     <div className="text-center text-muted-foreground p-12 space-y-3">
+                        <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                        <h3 className="text-xl font-semibold text-foreground">
+                            {t.noFileSelected}
+                        </h3>
+                        <p>{t.noQuestionsDescription}</p>
+                    </div>
+                  ) : questions.length > 0 || isPending ? (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t.tableHeaderQuestion}</TableHead>
+                            <TableHead className="text-center" colSpan={5}>
+                              {t.tableHeaderOptions}
+                            </TableHead>
+                            <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
+                            <TableHead>{t.tableHeaderExplanation}</TableHead>
+                            <TableHead className="w-[50px] text-center">{t.tableHeaderActions}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {questions.map((q, qIndex) => (
+                            <TableRow key={qIndex}>
+                              <TableCell className="font-medium align-top">
+                                <Textarea
+                                  value={q.question}
+                                  onChange={(e) =>
+                                    handleQuestionFieldChange(
+                                      qIndex,
+                                      'question',
+                                      e.target.value
+                                    )
+                                  }
+                                  rows={2}
+                                  className="w-full min-w-[200px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 resize-none"
+                                />
+                              </TableCell>
+                              {Array.from({ length: 5 }).map((_, oIndex) => {
+                                const optionText = q.options[oIndex] ?? '';
+                                const isCorrect = q.correctAnswer === optionText && optionText !== '';
 
-        <div className="lg:col-span-1">
-          <Card className="shadow-sm border">
-            <CardHeader>
-              <CardTitle className="font-headline text-2xl">
-                {t.addNewTextCardTitle}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder={t.textAreaPlaceholder}
-                value={text}
-                onChange={handleTextChange}
-                className="min-h-[150px] text-base focus-visible:ring-primary"
-                dir={detectLanguage(text) === 'ar' ? 'rtl' : 'ltr'}
-              />
+                                return (
+                                  <TableCell key={oIndex} className="p-1 align-top">
+                                      <Label
+                                        htmlFor={`q${qIndex}-o${oIndex}`}
+                                        className={cn(
+                                          'flex items-start w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors',
+                                          isCorrect
+                                            ? 'bg-accent/80'
+                                            : 'hover:bg-muted'
+                                        )}
+                                      >
+                                        <input
+                                          type="radio"
+                                          id={`q${qIndex}-o${oIndex}`}
+                                          name={`question-${qIndex}`}
+                                          value={optionText}
+                                          checked={isCorrect}
+                                          onChange={() =>
+                                            handleCorrectAnswerChange(
+                                              qIndex,
+                                              optionText
+                                            )
+                                          }
+                                          className="sr-only"
+                                        />
+                                        <div
+                                          className={cn(
+                                            'mt-1.5 w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all',
+                                            isCorrect
+                                              ? 'border-primary bg-primary'
+                                              : 'border-muted-foreground'
+                                          )}
+                                        >
+                                          {isCorrect && (
+                                            <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>
+                                          )}
+                                        </div>
+                                        <Textarea
+                                          value={optionText}
+                                          onChange={(e) =>
+                                            handleOptionChange(
+                                              qIndex,
+                                              oIndex,
+                                              e.target.value
+                                            )
+                                          }
+                                          className="flex-grow min-w-[150px] bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary p-0 text-sm resize-none"
+                                          rows={2}
+                                        />
+                                      </Label>
+                                  </TableCell>
+                                );
+                              })}
+                              <TableCell className="font-semibold text-primary align-top min-w-[150px]">
+                                {q.correctAnswer}
+                              </TableCell>
+                              <TableCell className="align-top">
+                                <Textarea
+                                  value={q.explanation}
+                                  onChange={(e) =>
+                                    handleQuestionFieldChange(
+                                      qIndex,
+                                      'explanation',
+                                      e.target.value
+                                    )
+                                  }
+                                  rows={2}
+                                  className="w-full min-w-[250px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 text-sm text-muted-foreground resize-none"
+                                />
+                              </TableCell>
+                              <TableCell className="align-top p-2 text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-muted-foreground hover:text-destructive"
+                                  onClick={() => handleDeleteQuestion(qIndex)}
+                                  aria-label={t.deleteQuestionTooltip}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {isPending && (
+                            <TableRow>
+                              <TableCell colSpan={9} className="p-8 text-center">
+                                <div className="flex justify-center items-center gap-3">
+                                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                  <span className="text-muted-foreground">
+                                    {t.analyzingButton}
+                                  </span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground p-12 space-y-3">
+                      <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
+                      <h3 className="text-xl font-semibold text-foreground">
+                        {t.noQuestionsYet}
+                      </h3>
+                      <p>{t.noQuestionsDescription}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
-              <div className="relative my-4 flex items-center justify-center">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <span className="relative bg-card px-2 text-sm text-muted-foreground">
-                  {t.orSeparator}
-                </span>
-              </div>
+            <div className="xl:col-span-1">
+              <Card className="shadow-sm border">
+                <CardHeader>
+                  <CardTitle className="font-headline text-2xl">
+                    {t.addNewTextCardTitle}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder={t.textAreaPlaceholder}
+                    value={text}
+                    onChange={handleTextChange}
+                    className="min-h-[150px] text-base focus-visible:ring-primary"
+                    dir={detectLanguage(text) === 'ar' ? 'rtl' : 'ltr'}
+                    disabled={!activeFileId}
+                  />
 
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                accept="application/pdf,image/png,image/jpeg"
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                className="w-full"
-                disabled={isPending}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {fileName || t.uploadFileButton}
-              </Button>
+                  <div className="relative my-4 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <span className="relative bg-card px-2 text-sm text-muted-foreground">
+                      {t.orSeparator}
+                    </span>
+                  </div>
 
-              <Button
-                onClick={handleAnalyze}
-                disabled={isPending || (!text.trim() && !fileDataUri)}
-                className="mt-6 w-full"
-                size="lg"
-              >
-                {isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t.analyzingButton}
-                  </>
-                ) : (
-                  t.analyzeButton
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept="application/pdf,image/png,image/jpeg"
+                    disabled={!activeFileId}
+                  />
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    variant="outline"
+                    className="w-full"
+                    disabled={isPending || !activeFileId}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    {fileName || t.uploadFileButton}
+                  </Button>
+
+                  <Button
+                    onClick={handleAnalyze}
+                    disabled={isPending || (!text.trim() && !fileDataUri) || !activeFileId}
+                    className="mt-6 w-full"
+                    size="lg"
+                  >
+                    {isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {t.analyzingButton}
+                      </>
+                    ) : (
+                      t.analyzeButton
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </SidebarInset>
       </div>
     </div>
+   </SidebarProvider>
   );
 }
