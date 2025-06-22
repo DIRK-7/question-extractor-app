@@ -262,6 +262,11 @@ export default function QuestionExtractor() {
       `"${t.tableHeaderCorrectAnswer}"`,
       `"${t.tableHeaderExplanation}"`,
     ].join(';');
+    
+    const cleanCsvCell = (text: string): string => {
+      const cleanedText = (text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
+      return `"${cleanedText}"`;
+    };
 
     const rows = questions.map((q) => {
       const options = [...q.options];
@@ -269,12 +274,10 @@ export default function QuestionExtractor() {
         options.push('');
       }
       const rowData = [
-        `"${q.question.replace(/"/g, '""')}"`,
-        ...options
-          .slice(0, 5)
-          .map((opt) => `"${(opt || '').replace(/"/g, '""')}"`),
-        `"${q.correctAnswer.replace(/"/g, '""')}"`,
-        `"${(q.explanation || '').replace(/"/g, '""')}"`,
+        cleanCsvCell(q.question),
+        ...options.slice(0, 5).map(opt => cleanCsvCell(opt)),
+        cleanCsvCell(q.correctAnswer),
+        cleanCsvCell(q.explanation),
       ];
       return rowData.join(';');
     });
