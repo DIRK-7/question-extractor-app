@@ -21,8 +21,8 @@ const ExtractQuestionsOutputSchema = z.object({
   questions: z.array(
     z.object({
       question: z.string().describe('The extracted question.'),
-      options: z.array(z.string()).describe('The possible answers to the question.'),
-      correctAnswer: z.string().describe('The correct answer to the question.'),
+      options: z.array(z.string()).describe('The possible answers to the question. Each string must be a distinct and separate choice.'),
+      correctAnswer: z.string().describe('The correct answer to the question. This MUST exactly match one of the strings in the options array.'),
       explanation: z.string().describe('A detailed and academic explanation for why the answer is correct.'),
     })
   ).describe('The extracted questions and answers.'),
@@ -44,8 +44,8 @@ const prompt = ai.definePrompt({
 
   Given the following content, extract potential questions and answers. For each question, you must provide:
   1.  The question itself.
-  2.  A list of multiple-choice options. Ensure that each multiple-choice option is a distinct, separate, and concise answer. Do not merge multiple potential answers into a single option string.
-  3.  The single correct answer from the options.
+  2.  A list of multiple-choice options. CRITICAL: Each multiple-choice option must be a distinct, separate, and concise answer. Do NOT merge multiple potential answers into a single option string. Do not include numbering or bullet points within the option strings themselves.
+  3.  The single correct answer from the options. The value for the correctAnswer key must be one of the strings in the options array.
   4.  A detailed, academic, and accurate explanation for why the answer is correct. This explanation should be comprehensive, reference the source material where applicable, and clarify any underlying concepts to enhance learning. Avoid brief or superficial explanations.
 
   Language: {{language}}
@@ -60,9 +60,9 @@ const prompt = ai.definePrompt({
   {{media url=fileDataUri}}
   {{/if}}
 
-  Format the output as a JSON object with a "questions" array. Each object in the array should have the keys "question", "options", "correctAnswer", and "explanation". The options array should contain strings.
-  The value for the correctAnswer key must be one of the strings in the options array.
-  Example:
+  Format the output as a JSON object with a "questions" array. Each object in the array should have the keys "question", "options", "correctAnswer", and "explanation".
+  
+  Example of a valid response:
   {
     "questions": [
       {

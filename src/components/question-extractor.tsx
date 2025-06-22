@@ -593,6 +593,7 @@ function QuestionExtractorComponent() {
       if (fileToLoad && fileToLoad.type === 'file') {
         setActiveFileId(fileId);
         setQuestions(fileToLoad.questions);
+        setDownloadFileName(fileToLoad.name);
         setIsDirty(false);
         if (isMobile) {
           setOpenMobile(false);
@@ -820,8 +821,8 @@ function QuestionExtractorComponent() {
       >
         <div
           className={cn(
-            'flex items-center justify-between group rounded-md hover:bg-muted',
-            activeFileId === node.id && 'bg-accent text-accent-foreground'
+            'flex items-center justify-between group rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            activeFileId === node.id && 'bg-sidebar-primary text-sidebar-primary-foreground'
           )}
         >
           <button
@@ -922,7 +923,9 @@ function QuestionExtractorComponent() {
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent>{renderTree(fileTree, 0)}</SidebarContent>
+      <SidebarContent className="p-2">
+         {renderTree(fileTree, 0)}
+      </SidebarContent>
       <SidebarFooter className="flex-col gap-2">
         <Button
           variant="outline"
@@ -951,7 +954,7 @@ function QuestionExtractorComponent() {
   );
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="flex flex-row-reverse min-h-screen w-full">
       {/* DIALOGS */}
       <AlertDialog
         open={isUnsavedChangesDialogOpen}
@@ -1044,33 +1047,33 @@ function QuestionExtractorComponent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <div className="flex flex-row-reverse gap-8">
-        {SidebarComponent}
         
-        <SidebarInset className="flex-1 min-w-0">
-         <header className="flex justify-between items-center mb-10">
-            <div className="text-right">
-                <h1 className="text-4xl md:text-5xl font-headline font-bold text-primary">
-                    {t.title}
-                </h1>
-                <p className="text-muted-foreground mt-3 text-lg md:text-xl">
-                    {t.description}
-                </p>
-            </div>
-             <div className="md:hidden">
-                <SidebarTrigger asChild>
-                <Button variant="outline" size="icon">
-                    <Menu className="h-6 w-6" />
-                    <span className="sr-only">{t.menu}</span>
-                </Button>
-                </SidebarTrigger>
-            </div>
-        </header>
+      {SidebarComponent}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <Card className="shadow-sm border h-full">
+      <SidebarInset className="flex-1 min-w-0">
+        <div className="flex flex-col h-full">
+          <header className="flex justify-between items-center p-4 sm:p-6 border-b">
+              <div className="text-right">
+                  <h1 className="text-2xl font-headline font-bold text-primary">
+                      {t.title}
+                  </h1>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                      {t.description}
+                  </p>
+              </div>
+              <div className="md:hidden">
+                  <SidebarTrigger asChild>
+                  <Button variant="outline" size="icon">
+                      <Menu className="h-6 w-6" />
+                      <span className="sr-only">{t.menu}</span>
+                  </Button>
+                  </SidebarTrigger>
+              </div>
+          </header>
+
+          <main className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 p-4 sm:p-6 lg:p-8">
+            <div className="md:col-span-2 flex flex-col h-full">
+              <Card className="shadow-sm border h-full flex flex-col">
                 <CardHeader>
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center justify-between w-full md:w-auto gap-4">
@@ -1192,9 +1195,9 @@ function QuestionExtractorComponent() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1 overflow-hidden">
                   {(questions.length > 0 || isPending) ? (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-auto h-full">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -1241,7 +1244,7 @@ function QuestionExtractorComponent() {
                                       className={cn(
                                         'flex items-start w-full h-full gap-2 p-2 rounded-md cursor-pointer transition-colors',
                                         isCorrect
-                                          ? 'bg-accent/80'
+                                          ? 'bg-accent/20'
                                           : 'hover:bg-muted'
                                       )}
                                     >
@@ -1339,15 +1342,15 @@ function QuestionExtractorComponent() {
                         <h3 className="text-xl font-semibold text-foreground">
                             {activeFileId ? t.noQuestionsYet : t.noFileSelected}
                         </h3>
-                        <p>{activeFileId ? t.noQuestionsDescription : t.noQuestionsDescription}</p>
+                        <p>{activeFileId ? t.noQuestionsDescription : t.noFileSelected}</p>
                     </div>
                 )}
                 </CardContent>
               </Card>
             </div>
 
-            <div className="lg:col-span-1">
-              <Card className="shadow-sm border">
+            <div className="md:col-span-1">
+              <Card className="shadow-sm border sticky top-8">
                 <CardHeader>
                   <CardTitle className="font-headline text-2xl">
                     {t.addNewTextCardTitle}
@@ -1406,9 +1409,9 @@ function QuestionExtractorComponent() {
                 </CardContent>
               </Card>
             </div>
-          </div>
-        </SidebarInset>
-      </div>
+          </main>
+        </div>
+      </SidebarInset>
     </div>
   );
 }

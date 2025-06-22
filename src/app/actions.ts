@@ -33,11 +33,18 @@ export async function extractQuestionsAction(
               options: q.options,
               correctAnswer: q.correctAnswer,
             });
+
+            // Ensure the corrected answer is one of the new options.
+            const finalAnswer = corrected.correctedOptions.includes(corrected.correctedAnswer)
+              ? corrected.correctedAnswer
+              : corrected.correctedOptions[0] || '';
+
+
             currentQuestion = {
               ...q,
               question: corrected.correctedQuestion,
               options: corrected.correctedOptions,
-              correctAnswer: corrected.correctedAnswer,
+              correctAnswer: finalAnswer,
             };
           } catch (e) {
             console.error('AI correction failed, falling back to basic cleaning', e);
