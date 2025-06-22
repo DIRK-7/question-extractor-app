@@ -39,6 +39,8 @@ const prompt = ai.definePrompt({
   output: {schema: ExtractQuestionsOutputSchema},
   prompt: `You are an expert in creating quizzes from text or documents. Your goal is to generate high-quality educational material.
 
+  You must scan the entire document or text provided and extract ALL possible questions from it. Do not stop until you have processed the entire content.
+
   Given the following content, extract potential questions and answers. For each question, you must provide:
   1.  The question itself.
   2.  A list of multiple-choice options.
