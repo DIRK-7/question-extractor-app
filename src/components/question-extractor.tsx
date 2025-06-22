@@ -21,13 +21,33 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Download, FileQuestion, Upload } from 'lucide-react';
+import {
+  Loader2,
+  Download,
+  FileQuestion,
+  Upload,
+  PlusCircle,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { extractQuestionsAction } from '@/app/actions';
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
 import type { ExtractQuestionsInput } from '@/ai/flows/extract-questions-from-text';
+import { ThemeToggle } from './theme-toggle';
 
 type Question = {
   question: string;
@@ -43,11 +63,12 @@ const translations = {
     textAreaPlaceholder: 'الصق النص هنا...',
     analyzeButton: 'استخراج الأسئلة',
     analyzingButton: 'جاري الاستخراج...',
-    downloadButton: 'تنزيل كملف CSV',
+    downloadButton: 'تصدير',
     tableHeaderQuestion: 'السؤال',
     tableHeaderOptions: 'الخيارات',
     tableHeaderCorrectAnswer: 'الإجابة الصحيحة',
     tableHeaderExplanation: 'التفسير',
+    tableHeaderActions: 'إجراءات',
     errorToastTitle: 'حدث خطأ',
     errorToastDescription: 'فشل استخراج الأسئلة. الرجاء المحاولة مرة أخرى.',
     errorEmptyText: 'الرجاء إدخال نص أو رفع ملف للتحليل.',
@@ -59,12 +80,21 @@ const translations = {
     addNewTextCardTitle: 'إضافة أسئلة جديدة',
     uploadFileButton: 'رفع ملف (صورة أو PDF)',
     orSeparator: 'أو',
-    downloadDialogTitle: 'تسمية الملف',
+    downloadDialogTitle: 'تسمية وتصدير الملف',
     downloadDialogDescription:
-      'أدخل اسمًا لملف CSV الخاص بك. سيتم إضافة الامتداد .csv تلقائيًا.',
+      'أدخل اسمًا لملفك واختر تنسيق التصدير. سيتم إضافة الامتداد تلقائيًا.',
     downloadDialogFileNameLabel: 'اسم الملف',
-    downloadDialogSaveButton: 'تنزيل',
+    downloadCsvButton: 'تنزيل كـ CSV',
+    downloadJsonButton: 'تنزيل كـ JSON',
     errorEmptyFileName: 'لا يمكن أن يكون اسم الملف فارغًا.',
+    addNewQuestionButton: 'إضافة سؤال جديد',
+    deleteQuestionTooltip: 'حذف السؤال',
+    clearAllButton: 'مسح الكل',
+    clearAllDialogTitle: 'هل أنت متأكد؟',
+    clearAllDialogDescription:
+      'سيؤدي هذا الإجراء إلى حذف جميع الأسئلة بشكل دائم. لا يمكن التراجع عن هذا الإجراء.',
+    clearAllDialogCancel: 'إلغاء',
+    clearAllDialogConfirm: 'تأكيد الحذف',
   },
   en: {
     title: 'Question Extractor',
@@ -73,11 +103,12 @@ const translations = {
     textAreaPlaceholder: 'Paste your text here...',
     analyzeButton: 'Extract Questions',
     analyzingButton: 'Extracting...',
-    downloadButton: 'Download as CSV',
+    downloadButton: 'Export',
     tableHeaderQuestion: 'Question',
     tableHeaderOptions: 'Options',
     tableHeaderCorrectAnswer: 'Correct Answer',
     tableHeaderExplanation: 'Explanation',
+    tableHeaderActions: 'Actions',
     errorToastTitle: 'Error',
     errorToastDescription: 'Failed to extract questions. Please try again.',
     errorEmptyText: 'Please enter text or upload a file to analyze.',
@@ -89,12 +120,21 @@ const translations = {
     addNewTextCardTitle: 'Add New Questions',
     uploadFileButton: 'Upload File (Image or PDF)',
     orSeparator: 'or',
-    downloadDialogTitle: 'Name Your File',
+    downloadDialogTitle: 'Name & Export File',
     downloadDialogDescription:
-      'Enter a name for your CSV file. The .csv extension will be added automatically.',
+      'Enter a name for your file and choose an export format. The extension will be added automatically.',
     downloadDialogFileNameLabel: 'File Name',
-    downloadDialogSaveButton: 'Download',
+    downloadCsvButton: 'Download as CSV',
+    downloadJsonButton: 'Download as JSON',
     errorEmptyFileName: 'File name cannot be empty.',
+    addNewQuestionButton: 'Add New Question',
+    deleteQuestionTooltip: 'Delete Question',
+    clearAllButton: 'Clear All',
+    clearAllDialogTitle: 'Are you sure?',
+    clearAllDialogDescription:
+      'This action will permanently delete all questions. This cannot be undone.',
+    clearAllDialogCancel: 'Cancel',
+    clearAllDialogConfirm: 'Confirm Delete',
   },
 };
 
@@ -109,6 +149,7 @@ export default function QuestionExtractor() {
   const [fileDataUri, setFileDataUri] = useState<string | null>(null);
   const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
   const [downloadFileName, setDownloadFileName] = useState('questions');
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
   const t = translations[language];
 
@@ -206,6 +247,25 @@ export default function QuestionExtractor() {
     });
   };
 
+  const handleAddQuestion = () => {
+    const newQuestion: Question = {
+      question: '',
+      options: ['', '', '', '', ''],
+      correctAnswer: '',
+      explanation: '',
+    };
+    setQuestions((prev) => [...prev, newQuestion]);
+  };
+
+  const handleDeleteQuestion = (indexToDelete: number) => {
+    setQuestions((prev) => prev.filter((_, index) => index !== indexToDelete));
+  };
+
+  const handleClearAll = () => {
+    setQuestions([]);
+    setIsClearConfirmOpen(false);
+  };
+
   const handleCorrectAnswerChange = (
     questionIndex: number,
     newCorrectAnswer: string
@@ -251,7 +311,7 @@ export default function QuestionExtractor() {
     );
   };
 
-  const executeDownload = (fileNameToDownload: string) => {
+  const executeCsvDownload = (fileNameToDownload: string) => {
     const headers = [
       `"${t.tableHeaderQuestion}"`,
       '"Option A"',
@@ -262,9 +322,11 @@ export default function QuestionExtractor() {
       `"${t.tableHeaderCorrectAnswer}"`,
       `"${t.tableHeaderExplanation}"`,
     ].join(';');
-    
+
     const cleanCsvCell = (text: string): string => {
-      const cleanedText = (text || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
+      const cleanedText = (text || '')
+        .replace(/"/g, '""')
+        .replace(/\r?\n/g, ' ');
       return `"${cleanedText}"`;
     };
 
@@ -275,7 +337,7 @@ export default function QuestionExtractor() {
       }
       const rowData = [
         cleanCsvCell(q.question),
-        ...options.slice(0, 5).map(opt => cleanCsvCell(opt)),
+        ...options.slice(0, 5).map((opt) => cleanCsvCell(opt)),
         cleanCsvCell(q.correctAnswer),
         cleanCsvCell(q.explanation),
       ];
@@ -292,8 +354,21 @@ export default function QuestionExtractor() {
     link.click();
     document.body.removeChild(link);
   };
+  
+  const executeJsonDownload = (fileNameToDownload: string) => {
+    const jsonContent = JSON.stringify(questions, null, 2);
+    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${fileNameToDownload.trim()}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
-  const handleConfirmDownload = () => {
+
+  const handleConfirmDownload = (format: 'csv' | 'json') => {
     if (!downloadFileName.trim()) {
       toast({
         title: t.errorToastTitle,
@@ -302,7 +377,11 @@ export default function QuestionExtractor() {
       });
       return;
     }
-    executeDownload(downloadFileName);
+    if (format === 'csv') {
+      executeCsvDownload(downloadFileName);
+    } else {
+      executeJsonDownload(downloadFileName)
+    }
     setIsDownloadDialogOpen(false); // Close the dialog
   };
 
@@ -321,58 +400,100 @@ export default function QuestionExtractor() {
         <div className="lg:col-span-2">
           <Card className="shadow-sm border h-full">
             <CardHeader>
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <CardTitle className="font-headline text-2xl">
                   {t.extractedQuestionsTitle}
                 </CardTitle>
-                {questions.length > 0 && (
-                  <Dialog
-                    open={isDownloadDialogOpen}
-                    onOpenChange={setIsDownloadDialogOpen}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleAddQuestion}
+                    disabled={isPending}
                   >
-                    <DialogTrigger asChild>
-                      <Button variant="outline" disabled={isPending}>
-                        <Download className="mr-2 h-4 w-4" />
-                        {t.downloadButton}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>{t.downloadDialogTitle}</DialogTitle>
-                        <DialogDescription>
-                          {t.downloadDialogDescription}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label
-                            htmlFor="filename"
-                            className="text-right rtl:text-left"
-                          >
-                            {t.downloadDialogFileNameLabel}
-                          </Label>
-                          <Input
-                            id="filename"
-                            value={downloadFileName}
-                            onChange={(e) => setDownloadFileName(e.target.value)}
-                            className="col-span-3"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                handleConfirmDownload();
-                              }
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <Button onClick={handleConfirmDownload}>
-                          {t.downloadDialogSaveButton}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                )}
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    {t.addNewQuestionButton}
+                  </Button>
+                  {questions.length > 0 && (
+                    <>
+                      <Dialog
+                        open={isDownloadDialogOpen}
+                        onOpenChange={setIsDownloadDialogOpen}
+                      >
+                        <DialogTrigger asChild>
+                          <Button variant="outline" disabled={isPending}>
+                            <Download className="mr-2 h-4 w-4" />
+                            {t.downloadButton}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                          <DialogHeader>
+                            <DialogTitle>{t.downloadDialogTitle}</DialogTitle>
+                            <DialogDescription>
+                              {t.downloadDialogDescription}
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                              <Label
+                                htmlFor="filename"
+                                className="text-right rtl:text-left"
+                              >
+                                {t.downloadDialogFileNameLabel}
+                              </Label>
+                              <Input
+                                id="filename"
+                                value={downloadFileName}
+                                onChange={(e) =>
+                                  setDownloadFileName(e.target.value)
+                                }
+                                className="col-span-3"
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button onClick={() => handleConfirmDownload('csv')}>
+                              {t.downloadCsvButton}
+                            </Button>
+                             <Button onClick={() => handleConfirmDownload('json')} variant="secondary">
+                              {t.downloadJsonButton}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+
+                      <AlertDialog
+                        open={isClearConfirmOpen}
+                        onOpenChange={setIsClearConfirmOpen}
+                      >
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" disabled={isPending}>
+                            <X className="mr-2 h-4 w-4" />
+                            {t.clearAllButton}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              {t.clearAllDialogTitle}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {t.clearAllDialogDescription}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>
+                              {t.clearAllDialogCancel}
+                            </AlertDialogCancel>
+                            <AlertDialogAction onClick={handleClearAll}>
+                              {t.clearAllDialogConfirm}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </>
+                  )}
+                  <ThemeToggle />
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -387,6 +508,7 @@ export default function QuestionExtractor() {
                         </TableHead>
                         <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
                         <TableHead>{t.tableHeaderExplanation}</TableHead>
+                        <TableHead className="w-[50px] text-center">{t.tableHeaderActions}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -486,11 +608,22 @@ export default function QuestionExtractor() {
                               className="w-full min-w-[250px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 text-sm text-muted-foreground resize-none"
                             />
                           </TableCell>
+                          <TableCell className="align-top p-2 text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteQuestion(qIndex)}
+                              aria-label={t.deleteQuestionTooltip}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                       {isPending && (
                         <TableRow>
-                          <TableCell colSpan={8} className="p-8 text-center">
+                          <TableCell colSpan={9} className="p-8 text-center">
                             <div className="flex justify-center items-center gap-3">
                               <Loader2 className="h-6 w-6 animate-spin text-primary" />
                               <span className="text-muted-foreground">
