@@ -44,7 +44,7 @@ const prompt = ai.definePrompt({
 
   Given the following content, extract potential questions and answers. For each question, you must provide:
   1.  The question itself.
-  2.  A list of multiple-choice options.
+  2.  A list of multiple-choice options. Ensure that each multiple-choice option is a distinct, separate, and concise answer. Do not merge multiple potential answers into a single option string.
   3.  The single correct answer from the options.
   4.  A detailed, academic, and accurate explanation for why the answer is correct. This explanation should be comprehensive, reference the source material where applicable, and clarify any underlying concepts to enhance learning. Avoid brief or superficial explanations.
 

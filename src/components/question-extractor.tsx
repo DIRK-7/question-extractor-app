@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition, useEffect, useRef, ChangeEvent } from 'react';
+import React, { useState, useTransition, useEffect, useRef, ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -69,7 +69,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 import { extractQuestionsAction } from '@/app/actions';
 import { cn } from '@/lib/utils';
@@ -186,8 +185,10 @@ const translations = {
     successToastTitle: 'نجاح',
     successToastDescription: 'تمت إضافة الأسئلة الجديدة بنجاح.',
     extractedQuestionsTitle: 'بنك الأسئلة',
+    unsavedQuestions: 'أسئلة غير محفوظة',
     noQuestionsYet: 'لا توجد أسئلة في هذا الملف بعد.',
-    noQuestionsDescription: 'استخدم اللوحة اليمنى لإضافة أسئلة جديدة.',
+    noQuestionsDescription:
+      'استخدم اللوحة اليمنى لإضافة أسئلة جديدة أو استخراجها من نص.',
     addNewTextCardTitle: 'إضافة أسئلة جديدة',
     uploadFileButton: 'رفع ملف (صورة أو PDF)',
     orSeparator: 'أو',
@@ -247,9 +248,10 @@ const translations = {
     successToastTitle: 'Success',
     successToastDescription: 'New questions added successfully.',
     extractedQuestionsTitle: 'Question Bank',
+    unsavedQuestions: 'Unsaved Questions',
     noQuestionsYet: 'No questions in this file yet.',
     noQuestionsDescription:
-      'Use the right panel to add new questions.',
+      'Use the right panel to add new questions or extract them from text.',
     addNewTextCardTitle: 'Add New Questions',
     uploadFileButton: 'Upload File (Image or PDF)',
     orSeparator: 'or',
@@ -292,6 +294,27 @@ const translations = {
     menu: 'Menu',
   },
 };
+
+const AutosizeTextarea = React.forwardRef<
+  HTMLTextAreaElement,
+  React.ComponentProps<typeof Textarea>
+>((props, ref) => {
+  const textAreaRef = React.useRef<HTMLTextAreaElement>(null);
+  React.useImperativeHandle(ref, () => textAreaRef.current!, []);
+
+  const { value } = props;
+
+  React.useEffect(() => {
+    if (textAreaRef.current) {
+      textAreaRef.current.style.height = 'auto';
+      textAreaRef.current.style.height = `${textAreaRef.current.scrollHeight}px`;
+    }
+  }, [value, textAreaRef]);
+
+  return <Textarea ref={textAreaRef} {...props} rows={1} />;
+});
+AutosizeTextarea.displayName = 'AutosizeTextarea';
+
 
 function QuestionExtractorComponent() {
   const [text, setText] = useState('');
@@ -439,7 +462,6 @@ function QuestionExtractorComponent() {
   // Check for unsaved changes
   useEffect(() => {
     if (!activeFileId) {
-      // If no file is active, any questions are "dirty" by default if they exist.
       setIsDirty(questions.length > 0);
       return;
     }
@@ -523,10 +545,7 @@ function QuestionExtractorComponent() {
 
         const result = await extractQuestionsAction(inputPayload);
 
-        // If a file is active, add to it. Otherwise, treat as new set of questions.
-        setQuestions((prevQuestions) => 
-            activeFileId ? [...prevQuestions, ...result.questions] : result.questions
-        );
+        setQuestions((prevQuestions) => [...prevQuestions, ...result.questions]);
 
         setText('');
         setFileDataUri(null);
@@ -897,7 +916,10 @@ function QuestionExtractorComponent() {
       <SidebarHeader>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t.fileExplorer}</h2>
-          <SidebarTrigger className="hidden md:block" />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <SidebarTrigger className="hidden md:block" />
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>{renderTree(fileTree, 0)}</SidebarContent>
@@ -1036,32 +1058,27 @@ function QuestionExtractorComponent() {
                     {t.description}
                 </p>
             </div>
-            <div className="flex items-center gap-2">
-                <ThemeToggle />
-                 <div className="md:hidden">
-                    <SidebarTrigger asChild>
-                    <Button variant="outline" size="icon">
-                        <Menu className="h-6 w-6" />
-                        <span className="sr-only">{t.menu}</span>
-                    </Button>
-                    </SidebarTrigger>
-                </div>
+             <div className="md:hidden">
+                <SidebarTrigger asChild>
+                <Button variant="outline" size="icon">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">{t.menu}</span>
+                </Button>
+                </SidebarTrigger>
             </div>
         </header>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            <div className="xl:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
               <Card className="shadow-sm border h-full">
                 <CardHeader>
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center justify-between w-full md:w-auto gap-4">
                       <CardTitle
                         className="font-headline text-2xl truncate"
-                        title={activeFile?.name || t.extractedQuestionsTitle}
+                        title={activeFile?.name || (isDirty ? t.unsavedQuestions : t.extractedQuestionsTitle)}
                       >
-                        {activeFile
-                          ? activeFile.name
-                          : t.extractedQuestionsTitle}
+                         {activeFile?.name || (isDirty ? t.unsavedQuestions : t.extractedQuestionsTitle)}
                       </CardTitle>
                       
                     </div>
@@ -1196,7 +1213,7 @@ function QuestionExtractorComponent() {
                           {questions.map((q, qIndex) => (
                             <TableRow key={qIndex}>
                               <TableCell className="font-medium align-top">
-                                <Textarea
+                                <AutosizeTextarea
                                   value={q.question}
                                   onChange={(e) =>
                                     handleQuestionFieldChange(
@@ -1205,7 +1222,6 @@ function QuestionExtractorComponent() {
                                       e.target.value
                                     )
                                   }
-                                  rows={2}
                                   className="w-full min-w-[200px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 resize-none"
                                 />
                               </TableCell>
@@ -1252,10 +1268,10 @@ function QuestionExtractorComponent() {
                                         )}
                                       >
                                         {isCorrect && (
-                                          <div className="w-2 h-2 rounded-full bg-accent-foreground"></div>
+                                          <div className="w-2 h-2 rounded-full bg-primary-foreground"></div>
                                         )}
                                       </div>
-                                      <Textarea
+                                      <AutosizeTextarea
                                         value={optionText}
                                         onChange={(e) =>
                                           handleOptionChange(
@@ -1265,7 +1281,6 @@ function QuestionExtractorComponent() {
                                           )
                                         }
                                         className="flex-grow min-w-[150px] bg-transparent border-none focus-visible:ring-1 focus-visible:ring-primary p-0 text-sm resize-none"
-                                        rows={2}
                                       />
                                     </Label>
                                   </TableCell>
@@ -1275,7 +1290,7 @@ function QuestionExtractorComponent() {
                                 {q.correctAnswer}
                               </TableCell>
                               <TableCell className="align-top">
-                                <Textarea
+                                <AutosizeTextarea
                                   value={q.explanation}
                                   onChange={(e) =>
                                     handleQuestionFieldChange(
@@ -1284,7 +1299,6 @@ function QuestionExtractorComponent() {
                                       e.target.value
                                     )
                                   }
-                                  rows={2}
                                   className="w-full min-w-[250px] bg-transparent border-0 focus-visible:ring-1 focus-visible:ring-primary p-1 text-sm text-muted-foreground resize-none"
                                 />
                               </TableCell>
@@ -1323,16 +1337,16 @@ function QuestionExtractorComponent() {
                     <div className="text-center text-muted-foreground p-12 space-y-3 h-full flex flex-col justify-center items-center">
                         <FileQuestion className="h-12 w-12 mx-auto text-muted-foreground/50" />
                         <h3 className="text-xl font-semibold text-foreground">
-                            {t.noFileSelected}
+                            {activeFileId ? t.noQuestionsYet : t.noFileSelected}
                         </h3>
-                        <p>{t.noQuestionsDescription}</p>
+                        <p>{activeFileId ? t.noQuestionsDescription : t.noQuestionsDescription}</p>
                     </div>
                 )}
                 </CardContent>
               </Card>
             </div>
 
-            <div className="xl:col-span-1">
+            <div className="lg:col-span-1">
               <Card className="shadow-sm border">
                 <CardHeader>
                   <CardTitle className="font-headline text-2xl">
