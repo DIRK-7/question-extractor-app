@@ -22,6 +22,7 @@ const ExtractQuestionsOutputSchema = z.object({
       question: z.string().describe('The extracted question.'),
       options: z.array(z.string()).describe('The possible answers to the question.'),
       correctAnswer: z.string().describe('The correct answer to the question.'),
+      explanation: z.string().describe('The explanation for why the answer is correct.'),
     })
   ).describe('The extracted questions and answers.'),
 });
@@ -37,12 +38,12 @@ const prompt = ai.definePrompt({
   output: {schema: ExtractQuestionsOutputSchema},
   prompt: `You are an expert in creating quizzes from text.
 
-  Given the following text, extract potential questions and answers, along with the correct answer for each question. The questions should be relevant to the content of the text, and the answers should be accurate and clear.
+  Given the following text, extract potential questions and answers, along with the correct answer and a brief explanation for each question. The questions should be relevant to the content of the text, and the answers should be accurate and clear.
 
   Language: {{language}}
   Text: {{{text}}}
 
-  Format the output as a JSON object with a "questions" array. Each object in the array should have the keys "question", "options" and "correctAnswer". The options array should contain strings.
+  Format the output as a JSON object with a "questions" array. Each object in the array should have the keys "question", "options", "correctAnswer", and "explanation". The options array should contain strings.
   The value for the correctAnswer key should be one of the strings in the options array.
   Example:
   {
@@ -50,12 +51,14 @@ const prompt = ai.definePrompt({
       {
         "question": "What is the capital of France?",
         "options": ["Berlin", "Paris", "Rome", "Madrid"],
-        "correctAnswer": "Paris"
+        "correctAnswer": "Paris",
+        "explanation": "Paris is the capital and most populous city of France."
       },
       {
         "question": "What is the highest mountain in the world?",
         "options": ["Mount Everest", "K2", "Kangchenjunga", "Lhotse"],
-        "correctAnswer": "Mount Everest"
+        "correctAnswer": "Mount Everest",
+        "explanation": "Mount Everest is Earth's highest mountain above sea level, located in the Mahalangur Himal sub-range of the Himalayas."
       }
     ]
   }

@@ -13,15 +13,22 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Download } from 'lucide-react';
+import { Loader2, Download, Info } from 'lucide-react';
 import { extractQuestionsAction } from '@/app/actions';
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type Question = {
   question: string;
   options: string[];
   correctAnswer: string;
+  explanation: string;
 };
 
 const translations = {
@@ -34,6 +41,7 @@ const translations = {
     downloadButton: 'تنزيل كملف Excel',
     tableHeaderQuestion: 'السؤال',
     tableHeaderCorrectAnswer: 'الإجابة الصحيحة',
+    tableHeaderExplanation: 'تفسير الإجابة',
     errorToastTitle: 'خطأ',
     errorToastDescription: 'حدث خطأ أثناء استخراج الأسئلة.',
     errorEmptyText: 'الرجاء إدخال نص للتحليل.',
@@ -49,6 +57,7 @@ const translations = {
     downloadButton: 'Download as Excel File',
     tableHeaderQuestion: 'Question',
     tableHeaderCorrectAnswer: 'Correct Answer',
+    tableHeaderExplanation: 'Answer Explanation',
     errorToastTitle: 'Error',
     errorToastDescription: 'An error occurred while extracting questions.',
     errorEmptyText: 'Please enter text to analyze.',
@@ -120,7 +129,8 @@ export default function QuestionExtractor() {
     const headers = [
       t.tableHeaderQuestion,
       'A', 'B', 'C', 'D', 'E',
-      t.tableHeaderCorrectAnswer
+      t.tableHeaderCorrectAnswer,
+      t.tableHeaderExplanation
     ].join(';');
 
     const rows = questions.map(q => {
@@ -131,7 +141,8 @@ export default function QuestionExtractor() {
       const rowData = [
         `"${q.question.replace(/"/g, '""')}"`,
         ...options.slice(0, 5).map(opt => `"${opt.replace(/"/g, '""')}"`),
-        `"${q.correctAnswer.replace(/"/g, '""')}"`
+        `"${q.correctAnswer.replace(/"/g, '""')}"`,
+        `"${(q.explanation || '').replace(/"/g, '""')}"`
       ];
       return rowData.join(';');
     });
@@ -188,60 +199,75 @@ export default function QuestionExtractor() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-                <Table>
-                <TableHeader>
-                    <TableRow>
-                    <TableHead className="min-w-[250px]">{t.tableHeaderQuestion}</TableHead>
-                    <TableHead>A</TableHead>
-                    <TableHead>B</TableHead>
-                    <TableHead>C</TableHead>
-                    <TableHead>D</TableHead>
-                    <TableHead>E</TableHead>
-                    <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {questions.map((q, qIndex) => (
-                    <TableRow key={qIndex}>
-                        <TableCell className="font-medium">{q.question}</TableCell>
-                        {Array.from({ length: 5 }).map((_, oIndex) => {
-                            const optionText = q.options[oIndex] || '';
-                            const isCorrect = q.correctAnswer === optionText;
-                            
-                            return (
-                                <TableCell key={oIndex}>
-                                {optionText && (
-                                    <div
-                                        onClick={() => handleCorrectAnswerChange(qIndex, optionText)}
-                                        className={cn(
-                                            "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
-                                            isCorrect ? 'bg-accent' : 'hover:bg-muted'
-                                        )}
-                                    >
-                                        <input
-                                            type="radio"
-                                            id={`q${qIndex}-o${oIndex}`}
-                                            name={`question-${qIndex}`}
-                                            value={optionText}
-                                            checked={isCorrect}
-                                            onChange={() => {}}
-                                            className="form-radio h-4 w-4 accent-primary"
-                                        />
-                                        <Label htmlFor={`q${qIndex}-o${oIndex}`} className="cursor-pointer">
-                                            {optionText}
-                                        </Label>
-                                    </div>
-                                )}
-                                </TableCell>
-                            );
-                        })}
-                        <TableCell className="font-semibold text-primary">{q.correctAnswer}</TableCell>
-                    </TableRow>
-                    ))}
-                </TableBody>
-                </Table>
-            </div>
+            <TooltipProvider>
+              <div className="overflow-x-auto">
+                  <Table>
+                  <TableHeader>
+                      <TableRow>
+                      <TableHead className="min-w-[250px]">{t.tableHeaderQuestion}</TableHead>
+                      <TableHead>A</TableHead>
+                      <TableHead>B</TableHead>
+                      <TableHead>C</TableHead>
+                      <TableHead>D</TableHead>
+                      <TableHead>E</TableHead>
+                      <TableHead>{t.tableHeaderCorrectAnswer}</TableHead>
+                      <TableHead>{t.tableHeaderExplanation}</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {questions.map((q, qIndex) => (
+                      <TableRow key={qIndex}>
+                          <TableCell className="font-medium">{q.question}</TableCell>
+                          {Array.from({ length: 5 }).map((_, oIndex) => {
+                              const optionText = q.options[oIndex] || '';
+                              const isCorrect = q.correctAnswer === optionText;
+                              
+                              return (
+                                  <TableCell key={oIndex}>
+                                  {optionText && (
+                                      <div
+                                          onClick={() => handleCorrectAnswerChange(qIndex, optionText)}
+                                          className={cn(
+                                              "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                                              isCorrect ? 'bg-accent' : 'hover:bg-muted'
+                                          )}
+                                      >
+                                          <input
+                                              type="radio"
+                                              id={`q${qIndex}-o${oIndex}`}
+                                              name={`question-${qIndex}`}
+                                              value={optionText}
+                                              checked={isCorrect}
+                                              onChange={() => {}}
+                                              className="form-radio h-4 w-4 accent-primary"
+                                          />
+                                          <Label htmlFor={`q${qIndex}-o${oIndex}`} className="cursor-pointer">
+                                              {optionText}
+                                          </Label>
+                                      </div>
+                                  )}
+                                  </TableCell>
+                              );
+                          })}
+                          <TableCell className="font-semibold text-primary">{q.correctAnswer}</TableCell>
+                          <TableCell>
+                            {q.explanation && (
+                              <Tooltip>
+                                <TooltipTrigger>
+                                  <Info className="h-5 w-5 text-muted-foreground" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="max-w-sm">{q.explanation}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </TableCell>
+                      </TableRow>
+                      ))}
+                  </TableBody>
+                  </Table>
+              </div>
+            </TooltipProvider>
           </CardContent>
         </Card>
       )}

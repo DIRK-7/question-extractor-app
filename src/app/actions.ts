@@ -22,6 +22,7 @@ export async function extractQuestionsAction(input: ExtractQuestionsInput): Prom
         ...q,
         options: cleanedOptions,
         correctAnswer: newCorrectAnswer,
+        explanation: q.explanation || '',
       };
     });
 
